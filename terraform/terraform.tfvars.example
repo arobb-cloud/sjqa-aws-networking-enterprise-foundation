@@ -1,0 +1,4 @@
+aws_region   = "us-east-1"
+project_name = "networking-enterprise-foundation"
+environment  = "dev"
+owner        = "cloud-portfolio"
