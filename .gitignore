@@ -18,3 +18,10 @@ override.tf.json
 .DS_Store
 Thumbs.db
 .vscode/
+
+# Terraform plan files
+tfplan
+*.tfplan
+
+# Optional plan output
+terraform-plan.txt
