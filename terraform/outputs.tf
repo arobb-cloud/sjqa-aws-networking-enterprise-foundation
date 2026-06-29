@@ -37,3 +37,23 @@ output "public_route_table_id" {
 output "private_route_table_id" {
   value = aws_route_table.private.id
 }
+
+output "database_security_group_id" {
+  value = aws_security_group.database.id
+}
+
+output "application_security_group_id" {
+  value = aws_security_group.application.id
+}
+
+output "management_security_group_id" {
+  value = aws_security_group.management.id
+}
+
+output "public_network_acl_id" {
+  value = aws_network_acl.public.id
+}
+
+output "private_network_acl_id" {
+  value = aws_network_acl.private.id
+}
