@@ -57,3 +57,11 @@ output "public_network_acl_id" {
 output "private_network_acl_id" {
   value = aws_network_acl.private.id
 }
+
+output "public_subnet_b_id" {
+  value = aws_subnet.public_b.id
+}
+
+output "private_subnet_b_id" {
+  value = aws_subnet.private_b.id
+}

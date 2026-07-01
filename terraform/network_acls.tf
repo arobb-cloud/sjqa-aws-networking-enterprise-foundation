@@ -1,6 +1,10 @@
 resource "aws_network_acl" "public" {
-  vpc_id     = aws_vpc.main.id
-  subnet_ids = [aws_subnet.public_a.id]
+  vpc_id = aws_vpc.main.id
+
+  subnet_ids = [
+    aws_subnet.public_a.id,
+    aws_subnet.public_b.id
+  ]
 
   tags = {
     Name        = "${var.project_name}-${var.environment}-public-nacl"
@@ -11,8 +15,12 @@ resource "aws_network_acl" "public" {
 }
 
 resource "aws_network_acl" "private" {
-  vpc_id     = aws_vpc.main.id
-  subnet_ids = [aws_subnet.private_a.id]
+  vpc_id = aws_vpc.main.id
+
+  subnet_ids = [
+    aws_subnet.private_a.id,
+    aws_subnet.private_b.id
+  ]
 
   tags = {
     Name        = "${var.project_name}-${var.environment}-private-nacl"
@@ -175,4 +183,5 @@ resource "aws_network_acl_rule" "private_outbound_ephemeral_to_vpc" {
   from_port      = 1024
   to_port        = 65535
 }
+
 
