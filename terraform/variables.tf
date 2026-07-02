@@ -33,7 +33,7 @@ variable "owner" {
 #variable "db_name" {
 #  description = "Initial PostgreSQL database name"
 #  type        = string
- # default     = "appdb"
+# default     = "appdb"
 #}
 
 #variable "db_username" {
