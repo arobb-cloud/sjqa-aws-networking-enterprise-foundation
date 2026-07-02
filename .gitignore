@@ -13,6 +13,7 @@ override.tf.json
 # Terraform variable files
 *.tfvars
 !terraform.tfvars.example
+terraform.tfvars
 
 # OS / editor
 .DS_Store
