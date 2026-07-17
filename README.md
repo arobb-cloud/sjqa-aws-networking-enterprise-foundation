@@ -122,23 +122,15 @@ README.md
 
 ## Documentation
 
-- [Architecture](architecture/architecture.md)
-- [Deployment Guide](docs/deployment-guide.md)
-- [Security Guide](docs/security.md)
-- [Troubleshooting Guide](docs/troubleshooting-guide.md)
-- [Cost Optimization](docs/cost-optimization.md)
-- [Lessons Learned](docs/lessons-learned.md)
-- [Operational Runbook](docs/operational-runbook.md)
-
 | Document | Description |
 |-----------|-------------|
-| Architecture | High-level infrastructure design and diagrams |
-| Deployment Guide | Step-by-step deployment instructions |
-| Security Guide | Security controls and IAM design |
-| Troubleshooting Guide | Common issues and resolutions |
-| Cost Optimization | Cost-saving decisions and recommendations |
-| Operational Runbook | Verification and maintenance procedures |
-| Lessons Learned | Technical observations and project reflections |
+| [Architecture](architecture/architecture.md) | High-level infrastructure design and diagrams |
+| [Deployment Guide](docs/deployment-guide.md) | Step-by-step deployment instructions |
+| [Security Guide](docs/security.md) | Security controls and IAM design |
+| [Troubleshooting Guide](docs/troubleshooting-guide.md) | Common issues and resolutions |
+| [Cost Optimization](docs/cost-optimization.md) | Cost-saving decisions and recommendations |
+| [Operational Runbook](docs/operational-runbook.md) | Verification and maintenance procedures |
+| [Lessons Learned](docs/lessons-learned.md) | Technical observations and project reflections |
 
 
 ## Deployment
