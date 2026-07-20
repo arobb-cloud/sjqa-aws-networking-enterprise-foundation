@@ -124,7 +124,7 @@ README.md
 
 | Document | Description |
 |-----------|-------------|
-| [Architecture](architecture/architecture.md) | High-level infrastructure design and diagrams |
+| [Architecture](images/AWS_Netwroking_Project_Architectural_Diagram.png) | High-level infrastructure design and diagrams |
 | [Deployment Guide](docs/deployment-guide.md) | Step-by-step deployment instructions |
 | [Security Guide](docs/security.md) | Security controls and IAM design |
 | [Troubleshooting Guide](docs/troubleshooting-guide.md) | Common issues and resolutions |
