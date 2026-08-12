@@ -58,7 +58,7 @@ The following Terraform-managed AWS resources were introduced:
 
 Created the Terraform configuration file:
 
-#```powershell
+```powershell
 New-Item vpc.tf
 
 The file contains the initial VPC networking configuration:
