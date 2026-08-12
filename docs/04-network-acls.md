@@ -564,7 +564,7 @@ No unexpected infrastructure should be destroyed or replaced.
 
 # Deployment
 
-## 17. Apply the Terraform Configuration
+## 1. Apply the Terraform Configuration
 
 After confirming the plan:
 
@@ -584,7 +584,7 @@ Confirm the deployment when prompted.
 
 # Post-Deployment Validation
 
-## 18. Verify Terraform State
+## 2. Verify Terraform State
 
 Run:
 
@@ -619,7 +619,7 @@ aws_network_acl_rule.private_outbound_ephemeral_to_vpc
 
 ---
 
-## 19. Verify Terraform Outputs
+## 3. Verify Terraform Outputs
 
 Run:
 
