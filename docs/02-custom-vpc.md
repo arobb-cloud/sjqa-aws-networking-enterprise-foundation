@@ -56,13 +56,13 @@ The following Terraform-managed AWS resources were introduced:
 
 ### Create `vpc.tf`
 
-Created the Terraform configuration file:
+Create the Terraform initial VPC networking configuration file:
 
 ```powershell
 New-Item vpc.tf
+```
 
-The file contains the initial VPC networking configuration:
-
+```
 resource "aws_vpc" "main" {
   cidr_block           = "10.22.0.0/16"
   enable_dns_support   = true
@@ -147,6 +147,7 @@ resource "aws_route_table_association" "private_a" {
   subnet_id      = aws_subnet.private_a.id
   route_table_id = aws_route_table.private.id
 }
+```
 
 # Update outputs.tf
 
