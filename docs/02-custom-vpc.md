@@ -56,7 +56,7 @@ The following Terraform-managed AWS resources were introduced:
 
 ### Create `vpc.tf`
 
-Create the Terraform initial VPC networking configuration file:
+Created the Terraform initial VPC networking configuration file:
 
 ```powershell
 New-Item vpc.tf
@@ -149,10 +149,11 @@ resource "aws_route_table_association" "private_a" {
 }
 ```
 
-# Update outputs.tf
+### Update outputs.tf
 
 Terraform outputs were added so that important resource identifiers could be easily referenced after deployment and by later Terraform resources.
 
+```
 output "vpc_id" {
   value = aws_vpc.main.id
 }
@@ -172,47 +173,63 @@ output "public_route_table_id" {
 output "private_route_table_id" {
   value = aws_route_table.private.id
 }
+```
 
-### 6. Deployment Procedure
-Validate Terraform Configuration
+## 6. Deployment Procedure
 
-The Terraform configuration was validated before deployment:
+### Validate Terraform Configuration
+
+Ensured Terraform configuration was validated before deployment:
+```
 terraform validate
+```
 
 A Terraform execution plan was then generated:
+```
 terraform plan -out=tfplan
+```
 
 The plan was also exported to a text file for review and documentation:
+```
 terraform show tfplan > terraform-plan.txt
+```
 
 The generated terraform-plan.txt file was stored outside of the tracked source-code tree so that it would not be unintentionally committed to the GitHub repository.
 
-# Update Source Control
+### Update Source Control
 
 The Terraform configuration changes were committed to Git:
+```
 git status
 git add .
 git commit -m "Updating file structure for Terraform"
 git push -u origin main
+```
 
-Deploy AWS Resources
+### Deploy AWS Resources
 
 The previously generated Terraform plan was applied:
+```
 terraform apply tfplan
+```
 
-Using the saved plan ensured that Terraform applied the same infrastructure changes that were reviewed during the planning step.
+**Note:** Using the saved plan ensured that Terraform applied the same infrastructure changes that were reviewed during the planning step.
 
-### 7. Validation
+## 7. Validation
 
 After deployment, Terraform state was reviewed to confirm that the expected resources were under Terraform management:
+```
 terraform state list
+```
 
 Terraform outputs were then reviewed:
+```
 terraform output
+```
 
 Validation confirmed that the VPC, subnets, Internet Gateway, route tables, routes, and route-table associations were successfully created.
 
-### 8. Outputs / Results
+## 8. Outputs / Results
 
 The deployment exposed the following Terraform outputs:
 
@@ -224,7 +241,7 @@ Private route table ID
 
 These outputs provide resource identifiers needed for later networking, security, compute, and database phases.
 
-### 9. Security Considerations
+## 9. Security Considerations
 
 The private subnet was intentionally created without a direct route to the Internet Gateway.
 
@@ -236,20 +253,20 @@ This establishes separation between resources intended to be publicly reachable 
 
 Additional network security controls are introduced in later phases.
 
-### 10. Cost Considerations
+## 10. Cost Considerations
 
 The networking resources created in this phase—such as the VPC, subnets, route tables, and Internet Gateway attachment—do not by themselves represent the major cost drivers of the architecture.
 
 Cost-sensitive networking components such as NAT Gateway architecture are evaluated separately in a later phase.
 
-### 11. Troubleshooting / Issues Encountered
+## 11. Troubleshooting / Issues Encountered
 
 No major deployment issues were recorded for this phase.
 
 The Terraform plan was exported for review, but the generated plan documentation was intentionally kept outside the Git-tracked code tree to avoid committing transient deployment artifacts.
 
 
-### 12. Lessons Learned
+## 12. Lessons Learned
 
 This phase demonstrated several foundational AWS networking concepts:
 
@@ -262,9 +279,9 @@ Terraform outputs provide a clean mechanism for exposing infrastructure identifi
 Reviewing a Terraform plan before applying infrastructure changes improves deployment predictability.
 
 
-### 13. Phase Completion
+## 13. Phase Completion
 
-Phase 22 successfully established the initial AWS networking foundation.
+Phase 02 successfully established the initial AWS networking foundation.
 
 At completion, the environment contained:
 
@@ -277,19 +294,4 @@ Public internet routing
 Terraform-managed subnet-to-route-table associations
 
 This foundation was ready to support subsequent networking and security enhancements.
-
-
-### What happened to your original numbered steps?
-
-Nothing was lost. They were simply reorganized according to **what type of information they represent**.
-
-Your original:
-
-```text
-1. Create VPC Terraform File
-2. Add outputs
-3. Validate Terraform backend
-4. Update Github
-5. Deploy the resources
-6. Verify
 
