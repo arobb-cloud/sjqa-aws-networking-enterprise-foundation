@@ -409,7 +409,7 @@ When traffic is permitted into a resource, response traffic for that connection 
 
 ## Phase Completion
 
-Phase 23 establishes the network security boundaries required by later phases of the project.
+Phase 03 establishes the network security boundaries required by later phases of the project.
 
 At completion, the VPC contains reusable security controls for:
 
