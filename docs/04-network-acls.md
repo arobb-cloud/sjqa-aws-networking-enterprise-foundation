@@ -1,9 +1,9 @@
-# Phase 24 — Network Access Control Lists (NACLs)
+# Phase 04 — Network Access Control Lists (NACLs)
 
 ## Purpose
 
 The purpose of this phase is to add **subnet-level network traffic controls** to the AWS VPC by implementing custom Network Access Control Lists (NACLs).
-Phase 03 introduced Security Groups to control traffic at the individual AWS resource or network-interface level. Phase 24 adds a second layer of network security by controlling which traffic can enter or leave the **public and private subnets**.
+Phase 03 introduced Security Groups to control traffic at the individual AWS resource or network-interface level. Phase 04 adds a second layer of network security by controlling which traffic can enter or leave the **public and private subnets**.
 
 The NACL configuration will support:
 
@@ -647,7 +647,7 @@ The exact IDs are assigned dynamically by AWS.
 
 # Expected Result
 
-At the completion of Phase 24, the VPC should contain two custom Network ACLs:
+At the completion of Phase 04, the VPC should contain two custom Network ACLs:
 
 ```text
 VPC
@@ -896,7 +896,7 @@ That architecture is addressed separately in the NAT Gateway phase.
 
 # Phase Completion Criteria
 
-Phase 24 is complete when:
+Phase 04 is complete when:
 
 * A public custom Network ACL exists.
 * A private custom Network ACL exists.
@@ -918,7 +918,7 @@ Phase 24 is complete when:
 
 ---
 
-# Phase 24 Result
+# Phase 04 Result
 
 Phase 04 adds a second network security layer to the custom AWS VPC.
 
