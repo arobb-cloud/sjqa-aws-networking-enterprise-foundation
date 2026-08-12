@@ -3,8 +3,7 @@
 ## Purpose
 
 The purpose of this phase is to add **subnet-level network traffic controls** to the AWS VPC by implementing custom Network Access Control Lists (NACLs).
-
-Phase 23 introduced Security Groups to control traffic at the individual AWS resource or network-interface level. Phase 24 adds a second layer of network security by controlling which traffic can enter or leave the **public and private subnets**.
+Phase 03 introduced Security Groups to control traffic at the individual AWS resource or network-interface level. Phase 24 adds a second layer of network security by controlling which traffic can enter or leave the **public and private subnets**.
 
 The NACL configuration will support:
 
@@ -54,7 +53,7 @@ Before beginning this phase, the following components should already exist:
 * Internet Gateway
 * Public route table
 * Private route table
-* Security Groups from Phase 23
+* Security Groups from Phase 03
 * Terraform AWS provider configuration
 * Terraform remote or local state
 * Working AWS CLI credentials
@@ -143,7 +142,7 @@ The public NACL permits:
 | Outbound  | TCP      |        443 | `0.0.0.0/0`          | HTTPS                      |
 | Outbound  | TCP      | 1024–65535 | `0.0.0.0/0`          | Ephemeral TCP traffic      |
 
-The Security Groups from Phase 23 provide the more granular resource-level controls.
+The Security Groups from Phase 03 provide the more granular resource-level controls.
 
 ---
 
@@ -383,7 +382,7 @@ resource "aws_network_acl_rule" "private_inbound_postgres_from_vpc" {
 
 This allows PostgreSQL traffic originating from inside the VPC to cross the private subnet boundary.
 
-The database Security Group from Phase 23 provides the more precise control over which application or management resources can actually establish the database connection.
+The database Security Group from Phase 03 provides the more precise control over which application or management resources can actually establish the database connection.
 
 ---
 
@@ -782,7 +781,7 @@ Traffic that does not match an explicit allow rule eventually reaches the NACL's
 
 # Security Architecture
 
-Phase 23 and Phase 24 now work together as complementary controls.
+Phase 03 and Phase 04 now work together as complementary controls.
 
 ```text
                  Network Security Layers
@@ -921,9 +920,9 @@ Phase 24 is complete when:
 
 # Phase 24 Result
 
-Phase 24 adds a second network security layer to the custom AWS VPC.
+Phase 04 adds a second network security layer to the custom AWS VPC.
 
-Phase 23 established:
+Phase 03 established:
 
 ```text
 Security Groups
@@ -931,7 +930,7 @@ Security Groups
        └── Resource-level access controls
 ```
 
-Phase 24 adds:
+Phase 04 adds:
 
 ```text
 Network ACLs
