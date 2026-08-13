@@ -1,4 +1,4 @@
-# Phase 25 — Multi-AZ Networking
+# Phase 05 — Multi-AZ Networking
 
 ## 1. Purpose
 
@@ -41,7 +41,7 @@ VPC: 10.22.0.0/16
         └── 10.22.11.0/24
 ```
 
-Phase 25 expands the network into a second Availability Zone:
+Phase 05 expands the network into a second Availability Zone:
 
 ```text
 VPC: 10.22.0.0/16
@@ -269,7 +269,7 @@ Private NACL
 └── Private Subnet B
 ```
 
-The NACL rules created during Phase 24 do not need to be recreated. The existing controls are extended to the new subnets through these subnet associations.
+The NACL rules created during Phase 04 do not need to be recreated. The existing controls are extended to the new subnets through these subnet associations.
 
 ---
 
@@ -382,7 +382,7 @@ Apply complete!
 
 ---
 
-# 6. Validation
+# 6. Post-Deployment Validation
 
 ## 6.1 Verify Terraform Outputs
 
@@ -428,7 +428,7 @@ Also verify that:
 
 # 7. Results
 
-Phase 25 expanded the VPC from a single-Availability-Zone design into a Multi-AZ network architecture.
+Phase 05 expanded the VPC from a single-Availability-Zone design into a Multi-AZ network architecture.
 
 The completed network now contains:
 
@@ -534,7 +534,7 @@ Private NACL
 └── Private Subnet B
 ```
 
-This extends the subnet-level security controls created in Phase 24 across both Availability Zones.
+This extends the subnet-level security controls created in Phase 04 across both Availability Zones.
 
 ---
 
@@ -587,7 +587,7 @@ Multi-AZ networking provides the foundation for high availability but does not m
 
 # 13. Phase Completion
 
-Phase 25 successfully expanded the custom VPC into a two-Availability-Zone network architecture.
+Phase 05 successfully expanded the custom VPC into a two-Availability-Zone network architecture.
 
 The VPC now contains:
 
@@ -601,4 +601,4 @@ The VPC now contains:
 
 The network is now prepared for later phases that introduce additional production-style AWS networking and database infrastructure.
 
-**Phase 25 Status: Complete — Multi-AZ Networking Established**
+**Phase 05 Status: Complete — Multi-AZ Networking Established**
