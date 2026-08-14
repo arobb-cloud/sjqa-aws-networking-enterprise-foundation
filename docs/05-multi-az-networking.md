@@ -540,8 +540,6 @@ This extends the subnet-level security controls created in Phase 04 across both 
 
 # 9. Security Consierations
 
-# 9. Security Considerations
-
 The Phase 05 Multi-AZ expansion extends the existing network architecture into a second Availability Zone while maintaining the security boundaries established in the previous networking phases.
 
 The addition of Public Subnet B and Private Subnet B does not introduce a new security model. Instead, the existing public and private network controls are extended consistently across both Availability Zones.
