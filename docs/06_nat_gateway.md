@@ -31,7 +31,7 @@ The objectives of this phase were to:
 6. Preserve the existing separation between public and private network tiers.
 7. Represent the proposed architecture using Terraform.
 8. Evaluate the cost implications before deployment.
-9. Avoid unnecessary charges in the portfolio/lab environment.
+9. Avoid unnecessary charges in the portfolio/project environment.
 
 ---
 
@@ -205,7 +205,7 @@ These outputs would make it easier to verify the deployed NAT Gateway and identi
 
 ## 5. Planned Deployment
 
-Under a production or fully deployed lab scenario, the NAT Gateway configuration would be deployed using the standard Terraform workflow:
+Under a production or fully deployed project scenario, the NAT Gateway configuration would be deployed using the standard Terraform workflow:
 
 ```powershell
 terraform fmt
@@ -464,7 +464,7 @@ The private subnet sends traffic **to** the NAT Gateway but does not contain the
 
 ### Cost Is an Architectural Consideration
 
-Not every technically valid resource needs to remain deployed in a lab environment.
+Not every technically valid resource needs to remain deployed in this project environment.
 
 The NAT Gateway configuration was intentionally documented rather than provisioned because the additional runtime cost was unnecessary for demonstrating the architectural concept.
 

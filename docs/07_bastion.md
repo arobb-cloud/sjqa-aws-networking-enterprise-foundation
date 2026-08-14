@@ -269,7 +269,7 @@ The bastion host architecture introduces costs associated with operating an EC2 
 
 Because the bastion host was not required for continuous operation during this portfolio build, the instance was not deployed.
 
-For a temporary lab environment, a bastion could be created only when administrative access is required and destroyed afterward.
+For a temporary project environment, a bastion could be created only when administrative access is required and destroyed afterward.
 
 A production environment should also evaluate whether a traditional bastion host is necessary. AWS Systems Manager Session Manager can provide managed administrative access to supported EC2 instances without requiring inbound SSH access or a publicly accessible bastion host.
 
@@ -285,7 +285,7 @@ The following security principles apply:
    Resources within private subnets should not receive public IP addresses solely for administrative access.
 
 2. **SSH access should be tightly restricted.**
-   The lab configuration specifies:
+   The project configuration specifies:
 
    ```hcl
    cidr_ipv4 = "0.0.0.0/0"
@@ -369,7 +369,7 @@ Key lessons include:
 * Security groups can be used to define trusted management relationships between tiers.
 * Open SSH access such as `0.0.0.0/0` is inappropriate for production environments.
 * Terraform can document and validate future infrastructure even when deployment is intentionally deferred.
-* Cost-conscious lab environments do not need to keep management infrastructure running continuously.
+* Cost-conscious project environments do not need to keep management infrastructure running continuously.
 * Modern AWS architectures may replace traditional SSH bastion patterns with Systems Manager Session Manager to reduce public exposure and key-management requirements.
 
 ---
