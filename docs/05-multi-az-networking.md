@@ -540,53 +540,240 @@ This extends the subnet-level security controls created in Phase 04 across both 
 
 # 9. Security Consierations
 
-The Multi-AZ expansion maintains the existing network security boundaries established in the previous phases. Adding a second Availability Zone extends the existing public and private network tiers without changing their intended security posture.
+# 9. Security Considerations
 
-1. **Public and Private Subnet Separation**
+The Phase 05 Multi-AZ expansion extends the existing network architecture into a second Availability Zone while maintaining the security boundaries established in the previous networking phases.
 
-   Public and private subnet separation remains intact across both Availability Zones. Public workloads are placed in public subnets, while database and other internal workloads can remain isolated within private subnets.
+The addition of Public Subnet B and Private Subnet B does not introduce a new security model. Instead, the existing public and private network controls are extended consistently across both Availability Zones.
 
-2. **Public Network ACL Protection**
+## 9.1 Public and Private Subnet Separation
 
-   Public Subnet A and Public Subnet B are associated with the existing public Network ACL. This ensures that the subnet-level traffic controls established for the public tier are consistently applied across both Availability Zones.
+Public and private subnet separation remains intact across both Availability Zones.
 
-3. **Private Network ACL Protection**
+The resulting network contains:
 
-   Private Subnet A and Private Subnet B are associated with the existing private Network ACL. This extends the private-tier subnet-level controls across both Availability Zones.
+* Public Subnet A in Availability Zone A.
+* Private Subnet A in Availability Zone A.
+* Public Subnet B in Availability Zone B.
+* Private Subnet B in Availability Zone B.
 
-4. **Existing NACL Rules Remain Consistent**
-
-   Adding Availability Zone B does not require a separate set of NACL rules. The existing public and private NACL configurations from Phase 24 are associated with the corresponding new subnets, maintaining consistent security controls across the Multi-AZ architecture.
-
-5. **Route Table Separation**
-
-   Public Subnet B is associated with the public route table, while Private Subnet B is associated with the private route table. This preserves the intended routing boundaries between the public and private network tiers.
-
-6. **Consistent Security Controls Across Availability Zones**
-
-   Expanding infrastructure into additional Availability Zones should not create weaker security boundaries. New subnets should inherit the same routing, NACL, and security design appropriate to their respective network tiers.
-
-The resulting security architecture remains consistent across both Availability Zones:
+This maintains the existing tiered network design:
 
 ```text
-                    VPC
-                     │
-        ┌────────────┴────────────┐
-        │                         │
-       AZ-A                      AZ-B
-        │                         │
-  ┌─────┴─────┐             ┌─────┴─────┐
-  │           │             │           │
-Public A   Private A     Public B    Private B
-  │           │             │           │
-  └─────┬─────┘             └─────┬─────┘
-        │                         │
- Public NACL                 Private NACL
- (Public A/B)                (Private A/B)
+Public Tier
+├── Public Subnet A — AZ-A
+└── Public Subnet B — AZ-B
+
+Private Tier
+├── Private Subnet A — AZ-A
+└── Private Subnet B — AZ-B
 ```
 
-This maintains consistent subnet-level security controls while extending the network architecture across multiple Availability Zones.
+Resources requiring public-facing network connectivity can be deployed within the public tier, while databases and other internal resources can remain within the private tier.
 
+---
+
+## 9.2 Public Network ACL Protection
+
+The public Network ACL created in Phase 24 is extended to include Public Subnet B.
+
+The public NACL is therefore associated with:
+
+```text
+Public NACL
+├── Public Subnet A — AZ-A
+└── Public Subnet B — AZ-B
+```
+
+This ensures that the subnet-level traffic controls established for the public network tier are applied consistently across both Availability Zones.
+
+A separate public NACL is not required simply because a second Availability Zone was introduced.
+
+---
+
+## 9.3 Private Network ACL Protection
+
+The private Network ACL created in Phase 24 is also extended to include Private Subnet B.
+
+The private NACL is associated with:
+
+```text
+Private NACL
+├── Private Subnet A — AZ-A
+└── Private Subnet B — AZ-B
+```
+
+This ensures that both private subnets receive the same subnet-level traffic controls.
+
+The database and other private workloads that may later be deployed across the two Availability Zones therefore remain within the same private network security tier.
+
+---
+
+## 9.4 Existing NACL Rules Remain Consistent
+
+Adding Availability Zone B does not require duplicating the individual NACL rules established in Phase 24.
+
+Instead, the existing NACL resources are associated with the additional subnets:
+
+```hcl
+subnet_ids = [
+  aws_subnet.public_a.id,
+  aws_subnet.public_b.id
+]
+```
+
+and:
+
+```hcl
+subnet_ids = [
+  aws_subnet.private_a.id,
+  aws_subnet.private_b.id
+]
+```
+
+This allows the same public-tier and private-tier NACL policies to be applied consistently across Availability Zones.
+
+The security policy therefore remains organized by **network tier** rather than by Availability Zone.
+
+---
+
+## 9.5 Route Table Separation
+
+The Multi-AZ expansion preserves the existing public and private routing boundaries.
+
+Public Subnet B is associated with the existing public route table:
+
+```text
+Public Subnet A ─┐
+                 ├── Public Route Table ── Internet Gateway
+Public Subnet B ─┘
+```
+
+Private Subnet B is associated with the existing private route table:
+
+```text
+Private Subnet A ─┐
+                  ├── Private Route Table
+Private Subnet B ─┘
+```
+
+This ensures that adding the second Availability Zone does not unintentionally give the private network tier the routing characteristics of the public tier.
+
+Route tables control where network traffic is directed; they are part of the network segmentation design, while NACLs and Security Groups provide traffic filtering controls.
+
+---
+
+## 9.6 Consistent Security Controls Across Availability Zones
+
+Expanding infrastructure across Availability Zones should preserve the same security posture for equivalent network tiers.
+
+The architecture therefore follows two separate organizational boundaries:
+
+**Availability boundary**
+
+```text
+AZ-A
+├── Public Subnet A
+└── Private Subnet A
+
+AZ-B
+├── Public Subnet B
+└── Private Subnet B
+```
+
+**Security boundary**
+
+```text
+Public Tier
+├── Public Subnet A
+└── Public Subnet B
+
+Private Tier
+├── Private Subnet A
+└── Private Subnet B
+```
+
+This distinction is important because Availability Zones provide infrastructure isolation and resiliency, while the public/private tiers define the network's security and routing boundaries.
+
+---
+
+## 9.7 Security Groups Remain a Separate Control Layer
+
+The NACL changes introduced during the Multi-AZ expansion do not replace the Security Groups established in Phase 23.
+
+The environment continues to use defense in depth:
+
+```text
+Route Tables
+     │
+     ▼
+Network ACLs
+     │
+     ▼
+Security Groups
+     │
+     ▼
+AWS Resources
+```
+
+Each control serves a different purpose:
+
+* **Route tables** determine where network traffic can be routed.
+* **Network ACLs** provide stateless subnet-level traffic filtering.
+* **Security Groups** provide stateful resource-level traffic filtering.
+
+The Multi-AZ expansion preserves these security layers while making the additional AZ-B subnets available for future workloads.
+
+---
+
+## 9.8 Final Multi-AZ Security Architecture
+
+The completed Phase 05 network security architecture is:
+
+```text
+                         AWS Region
+                              │
+                    VPC 10.22.0.0/16
+                              │
+          ┌───────────────────┴───────────────────┐
+          │                                      │
+ Availability Zone A                    Availability Zone B
+          │                                      │
+    ┌─────┴─────┐                          ┌─────┴─────┐
+    │           │                          │           │
+ Public A    Private A                  Public B    Private B
+10.22.1.0/24 10.22.11.0/24           10.22.2.0/24 10.22.12.0/24
+    │           │                          │           │
+    │           │                          │           │
+    └───────────┼──────────────────────────┼───────────┘
+                │                          │
+        Tier-Based Network Controls
+                │
+       ┌────────┴────────┐
+       │                 │
+   PUBLIC TIER       PRIVATE TIER
+       │                 │
+       ├─ Public A       ├─ Private A
+       └─ Public B       └─ Private B
+       │                 │
+ Public Route Table   Private Route Table
+       │                 │
+ Public NACL          Private NACL
+       │                 │
+ Security Groups      Security Groups
+       │                 │
+ Public Workloads     Private Workloads
+```
+
+The key security principle demonstrated by this architecture is:
+
+> **Availability is organized by Availability Zone, while network security controls remain organized by network tier.**
+
+The second Availability Zone therefore increases the network's capacity to support resilient workloads without creating a separate or weaker security model for AZ-B.
+
+Public Subnet A and Public Subnet B remain governed by the public-tier routing and NACL controls, while Private Subnet A and Private Subnet B remain governed by the private-tier routing and NACL controls.
+
+This maintains consistent network segmentation and defense-in-depth controls across the Multi-AZ VPC architecture.
 
 ---
 
