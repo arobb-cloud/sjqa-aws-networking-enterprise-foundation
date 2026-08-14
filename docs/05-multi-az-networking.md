@@ -540,6 +540,54 @@ This extends the subnet-level security controls created in Phase 04 across both 
 
 # 9. Security Consierations
 
+The Multi-AZ expansion maintains the existing network security boundaries established in the previous phases. Adding a second Availability Zone extends the existing public and private network tiers without changing their intended security posture.
+
+1. **Public and Private Subnet Separation**
+
+   Public and private subnet separation remains intact across both Availability Zones. Public workloads are placed in public subnets, while database and other internal workloads can remain isolated within private subnets.
+
+2. **Public Network ACL Protection**
+
+   Public Subnet A and Public Subnet B are associated with the existing public Network ACL. This ensures that the subnet-level traffic controls established for the public tier are consistently applied across both Availability Zones.
+
+3. **Private Network ACL Protection**
+
+   Private Subnet A and Private Subnet B are associated with the existing private Network ACL. This extends the private-tier subnet-level controls across both Availability Zones.
+
+4. **Existing NACL Rules Remain Consistent**
+
+   Adding Availability Zone B does not require a separate set of NACL rules. The existing public and private NACL configurations from Phase 24 are associated with the corresponding new subnets, maintaining consistent security controls across the Multi-AZ architecture.
+
+5. **Route Table Separation**
+
+   Public Subnet B is associated with the public route table, while Private Subnet B is associated with the private route table. This preserves the intended routing boundaries between the public and private network tiers.
+
+6. **Consistent Security Controls Across Availability Zones**
+
+   Expanding infrastructure into additional Availability Zones should not create weaker security boundaries. New subnets should inherit the same routing, NACL, and security design appropriate to their respective network tiers.
+
+The resulting security architecture remains consistent across both Availability Zones:
+
+```text
+                    VPC
+                     │
+        ┌────────────┴────────────┐
+        │                         │
+       AZ-A                      AZ-B
+        │                         │
+  ┌─────┴─────┐             ┌─────┴─────┐
+  │           │             │           │
+Public A   Private A     Public B    Private B
+  │           │             │           │
+  └─────┬─────┘             └─────┬─────┘
+        │                         │
+ Public NACL                 Private NACL
+ (Public A/B)                (Private A/B)
+```
+
+This maintains consistent subnet-level security controls while extending the network architecture across multiple Availability Zones.
+
+
 ---
 
 # 10. Cost Considerations
