@@ -6,7 +6,7 @@ The purpose of this phase was to deploy an Amazon RDS for PostgreSQL database in
 
 This phase builds on the networking and security controls implemented during the previous phases by placing the database within the existing private subnets and associating it with the previously created database security group.
 
-The deployment was designed to demonstrate a basic production-oriented database architecture while keeping the lab configuration small enough for a training and portfolio environment.
+The deployment was designed to demonstrate a basic production-oriented database architecture while keeping the project configuration small enough for a training and portfolio environment.
 
 The resulting traffic pattern is:
 
@@ -151,7 +151,7 @@ db_password = "<local-training-password>"
 
 The actual password should not be included in project documentation or committed to source control.
 
-For this lab, `terraform.tfvars` remained local to the workstation.
+For this project, `terraform.tfvars` remained local to the workstation.
 
 > **Security Note:** A production implementation should retrieve database credentials from a dedicated secrets-management mechanism, such as AWS Secrets Manager, or securely inject the value through a CI/CD secrets system. The local `terraform.tfvars` approach was used only for the training deployment.
 
@@ -294,20 +294,20 @@ resource "aws_db_instance" "postgres" {
 | Setting             | Configuration              | Purpose                                  |
 | ------------------- | -------------------------- | ---------------------------------------- |
 | Database Engine     | PostgreSQL 16              | Managed PostgreSQL database              |
-| Instance Class      | `db.t3.micro`              | Small lab/training instance              |
+| Instance Class      | `db.t3.micro`              | Small project/training instance          |
 | Storage             | 20 GB GP2                  | Minimal training storage                 |
 | Storage Encryption  | Enabled                    | Protect data at rest                     |
 | Public Access       | Disabled                   | Keep database private                    |
-| Multi-AZ            | Disabled                   | Reduce lab cost                          |
+| Multi-AZ            | Disabled                   | Reduce project cost                      |
 | Backup Retention    | 1 day                      | Demonstrate automated backups            |
 | Security Group      | Existing database SG       | Restrict PostgreSQL network access       |
 | DB Subnet Group     | Private A + Private B      | Keep database within private network     |
 | Parameter Group     | PostgreSQL 16 custom group | Enable connection logging                |
-| Enhanced Monitoring | Disabled                   | Avoid unnecessary lab configuration/cost |
-| Deletion Protection | Disabled                   | Allow lab teardown                       |
-| Final Snapshot      | Skipped                    | Simplify temporary lab destruction       |
+| Enhanced Monitoring | Disabled                   | Avoid unnecessary configuration/cost     |
+| Deletion Protection | Disabled                   | Allow project teardown                   |
+| Final Snapshot      | Skipped                    | Simplify temporary project destruction   |
 
-Several settings intentionally favor a temporary lab environment rather than a production deployment.
+Several settings intentionally favor a temporary project environment rather than a production deployment.
 
 In particular:
 
@@ -600,9 +600,9 @@ Automated backup retention was enabled:
 backup_retention_period = 1
 ```
 
-The one-day retention period was selected for the lab. Production systems would typically require a retention policy based on recovery objectives and organizational requirements.
+The one-day retention period was selected for the project. Production systems would typically require a retention policy based on recovery objectives and organizational requirements.
 
-### Lab-Specific Controls
+### Project-Specific Controls
 
 The following settings are appropriate for temporary training infrastructure but would require reconsideration for production:
 
@@ -668,7 +668,7 @@ Key lessons from this phase include:
    `.gitignore` provides a basic safeguard for the training project, while production environments should use dedicated secrets-management mechanisms.
 
 7. **Backup and deletion settings should reflect the environment.**
-   Short retention periods, disabled deletion protection, and skipped final snapshots simplify lab teardown but are generally inappropriate defaults for production databases.
+   Short retention periods, disabled deletion protection, and skipped final snapshots simplify project teardown but are generally inappropriate defaults for production databases.
 
 8. **RDS demonstrates dependency between infrastructure layers.**
    The database deployment validates the purpose of the VPC, private subnet, Multi-AZ network, NACL, and security-group work completed during earlier phases.
