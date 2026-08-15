@@ -66,13 +66,35 @@ output "private_subnet_b_id" {
   value = aws_subnet.private_b.id
 }
 
-##output "bastion_instance_id" {
+# NAT Gateway
+output "nat_gateway_id" {
+  description = "ID of the NAT Gateway when enabled"
+  value       = var.enable_nat_gateway ? aws_nat_gateway.nat_a[0].id : null
+}
+
+output "nat_gateway_public_ip" {
+  description = "Public IP address assigned to the NAT Gateway Elastic IP when enabled"
+  value       = var.enable_nat_gateway ? aws_eip.nat_a[0].public_ip : null
+}
+
+# Bastion
+#output "bastion_instance_id" {
 #  value = aws_instance.bastion.id
 #}
 
 #output "bastion_public_ip" {
 #  value = aws_instance.bastion.public_ip
 #}
+
+output "bastion_instance_id" {
+  description = "EC2 instance ID of the bastion host when enabled"
+  value       = var.enable_bastion ? aws_instance.bastion[0].id : null
+}
+
+output "bastion_public_ip" {
+  description = "Public IP address of the bastion host when enabled"
+  value       = var.enable_bastion ? aws_instance.bastion[0].public_ip : null
+}
 
 # RDS Outputs
 #output "rds_endpoint" {

@@ -2,3 +2,8 @@ aws_region   = "us-east-1"
 project_name = "networking-enterprise-foundation"
 environment  = "dev"
 owner        = "cloud-portfolio"
+
+enable_nat_gateway = false
+
+enable_bastion = false
+ssh_key_name   = null

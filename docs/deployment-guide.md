@@ -658,7 +658,7 @@ Common areas to investigate include:
 Detailed problems encountered while building the environment and their resolutions are documented separately in:
 
 ```text
-docs/Troubleshooting.md
+docs/troubleshooting.md
 ```
 
 This keeps the Deployment Guide focused on the deployment lifecycle while the Troubleshooting Guide maintains detailed diagnostic procedures and project-specific resolutions.

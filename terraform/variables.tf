@@ -22,12 +22,26 @@ variable "owner" {
   default     = "cloud-portfolio"
 }
 
+variable "enable_nat_gateway" {
+  description = "Whether to deploy the NAT Gateway and associated private subnet Internet route"
+  type        = bool
+  default     = false
+}
+
+variable "enable_bastion" {
+  description = "Controls whether the EC2 bastion host is deployed"
+  type        = bool
+  default     = false
+}
+
+
+
 # For Bastion host creation
-#variable "ssh_key_name" {
-#  description = "Name of the EC2 key pair for bastion access"
-#  type        = string
-#  default     = null
-#}
+variable "ssh_key_name" {
+  description = "Name of the EC2 key pair for bastion access"
+  type        = string
+  default     = null
+}
 
 # RDS Instance
 #variable "db_name" {
