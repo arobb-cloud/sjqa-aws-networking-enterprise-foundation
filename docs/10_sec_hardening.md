@@ -212,7 +212,7 @@ resource "aws_db_instance" "postgres" {
 This replaces the previous pattern where the database password was supplied directly through a Terraform variable such as:
 
 ```hcl
-db_password = "..."
+db_password = "REPLACE_WITH_STRONG_PASSWORD"
 ```
 
 The change improves credential management by separating the database password from the normal Terraform configuration and `terraform.tfvars` workflow.
