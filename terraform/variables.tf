@@ -43,6 +43,13 @@ variable "ssh_key_name" {
   default     = null
 }
 
+variable "bastion_allowed_cidr" {
+  description = "IPv4 CIDR permitted to SSH to the bastion host"
+  type        = string
+  default     = null
+}
+
+
 # RDS Instance
 #variable "db_name" {
 #  description = "Initial PostgreSQL database name"
