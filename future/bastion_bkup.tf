@@ -11,11 +11,9 @@ data "aws_ami" "amazon_linux_2023" {
 }
 
 resource "aws_vpc_security_group_ingress_rule" "bastion_ssh_from_internet" {
-  count = var.enable_bastion ? 1 : 0
-
   security_group_id = aws_security_group.management.id
 
-  cidr_ipv4   = var.bastion_allowed_cidr
+  cidr_ipv4   = "0.0.0.0/0"
   from_port   = 22
   to_port     = 22
   ip_protocol = "tcp"
