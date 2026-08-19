@@ -118,8 +118,8 @@ The current subnet layout is:
 | --------- | -------------- | ------- |
 | Public A  | `10.22.1.0/24` | Public  |
 | Public B  | `10.22.2.0/24` | Public  |
-| Private A | `10.22.3.0/24` | Private |
-| Private B | `10.22.4.0/24` | Private |
+| Private A | `10.22.11.0/24` | Private |
+| Private B | `10.22.12.0/24` | Private |
 
 ---
 
