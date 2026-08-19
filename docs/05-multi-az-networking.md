@@ -430,7 +430,7 @@ Also verify that:
 
 Phase 05 expanded the VPC from a single-Availability-Zone design into a Multi-AZ network architecture.
 
-The completed network now contains:
+The resulting Terraform network configuration defines:
 
 ```text
 AWS Region
@@ -446,7 +446,27 @@ AWS Region
         └── Private Subnet B — 10.22.12.0/24
 ```
 
-The environment now provides the networking foundation needed to distribute workloads across multiple Availability Zones.
+The Terraform configuration provides the networking foundation needed to distribute future workloads across multiple Availability Zones.
+
+---
+
+# Current Repository State
+
+The Multi-AZ subnet architecture introduced in this phase remains part of the active Terraform networking configuration under `terraform/`.
+
+The current repository defines:
+
+* Public Subnet A and Public Subnet B across two Availability Zones.
+* Private Subnet A and Private Subnet B across two Availability Zones.
+* Shared public route-table associations for both public subnets.
+* Shared private route-table associations for both private subnets.
+* Public Network ACL coverage across both public subnets.
+* Private Network ACL coverage across both private subnets.
+* Terraform outputs for the Availability Zone B subnet IDs.
+
+These resources provide a persistent Multi-AZ networking foundation independently of whether application, bastion, database, or other workload resources are currently deployed.
+
+Optional or staged components such as NAT Gateway routing and Amazon RDS PostgreSQL should therefore not be inferred solely from the existence of the Multi-AZ subnet architecture.
 
 ---
 
@@ -538,9 +558,9 @@ This extends the subnet-level security controls created in Phase 04 across both 
 
 ---
 
-# 9. Security Consierations
+# 9. Security Considerations
 
-For Phase 05 Multi-AZ expansion extends the existing network architecture into a second Availability Zone while maintaining the security boundaries established in the previous networking phases.
+Phase 05 extends the existing network architecture into a second Availability Zone while maintaining the security boundaries established in the previous networking phases.
 
 The addition of Public Subnet B and Private Subnet B does not introduce a new security model. Instead, the existing public and private network controls are extended consistently across both Availability Zones.
 
@@ -573,7 +593,7 @@ Resources requiring public-facing network connectivity can be deployed within th
 
 ## 9.2 Public Network ACL Protection
 
-The public Network ACL created in Phase 24 is extended to include Public Subnet B.
+The public Network ACL created in Phase 04 is extended to include Public Subnet B.
 
 The public NACL is therefore associated with:
 
@@ -591,7 +611,7 @@ A separate public NACL is not required simply because a second Availability Zone
 
 ## 9.3 Private Network ACL Protection
 
-The private Network ACL created in Phase 24 is also extended to include Private Subnet B.
+The private Network ACL created in Phase 04 is also extended to include Private Subnet B.
 
 The private NACL is associated with:
 
@@ -609,7 +629,7 @@ The database and other private workloads that may later be deployed across the t
 
 ## 9.4 Existing NACL Rules Remain Consistent
 
-Adding Availability Zone B does not require duplicating the individual NACL rules established in Phase 24.
+Adding Availability Zone B does not require duplicating the individual NACL rules established in Phase 04.
 
 Instead, the existing NACL resources are associated with the additional subnets:
 
@@ -697,7 +717,7 @@ This distinction is important because Availability Zones provide infrastructure 
 
 ## 9.7 Security Groups Remain a Separate Control Layer
 
-The NACL changes introduced during the Multi-AZ expansion do not replace the Security Groups established in Phase 23.
+The NACL changes introduced during the Multi-AZ expansion do not replace the Security Groups established in Phase 03.
 
 The environment continues to use defense in depth:
 
@@ -820,9 +840,9 @@ Multi-AZ networking provides the foundation for high availability but does not m
 
 # 13. Phase Completion
 
-Phase 05 successfully expanded the custom VPC into a two-Availability-Zone network architecture.
+Phase 05 successfully expanded the Terraform-defined custom VPC architecture across two Availability Zones.
 
-The VPC now contains:
+At completion of this phase, the Terraform configuration defined:
 
 * Two public subnets across two Availability Zones.
 * Two private subnets across two Availability Zones.
@@ -832,6 +852,6 @@ The VPC now contains:
 * Private NACL protection across both private subnets.
 * Terraform outputs for the additional subnet IDs.
 
-The network is now prepared for later phases that introduce additional production-style AWS networking and database infrastructure.
+The resulting network configuration provides the foundation for later phases that introduce additional optional or staged AWS networking and database capabilities.
 
 **Phase 05 Status: Complete — Multi-AZ Networking Established**

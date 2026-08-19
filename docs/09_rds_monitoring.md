@@ -4,7 +4,7 @@
 
 The purpose of this phase was to implement operational monitoring for the Amazon RDS for PostgreSQL database deployed in Phase 08.
 
-Amazon CloudWatch metrics and alarms were configured through Terraform to provide visibility into database resource utilization, capacity, connectivity, memory pressure, and storage I/O performance.
+Amazon CloudWatch metrics and alarms were defined through Terraform to provide a staged monitoring model for database resource utilization, capacity, connectivity, memory pressure, and storage I/O performance.
 
 The monitoring configuration extends the project from simply deploying an RDS database to implementing a basic **database reliability and observability model**.
 
@@ -28,14 +28,18 @@ Amazon CloudWatch
 CloudWatch Alarms
         │
         ▼
-Amazon SNS
+Amazon SNS Topic
         │
         ▼
-Operational Notification
+Notification Target
+(if a subscription is configured)
 ```
 
 ---
 
+**Current Repository State:** The Phase 09 monitoring design is retained as staged Terraform configuration under `future/`. The associated RDS PostgreSQL instance was previously deployed and validated during Phase 08 and was later destroyed to avoid ongoing AWS charges. The CloudWatch alarms and SNS integration documented in this phase therefore represent retained future-state monitoring configuration rather than currently deployed monitoring resources.
+
+---
 ## 2. Objectives
 
 The objectives of Phase 09 were to:
@@ -47,7 +51,7 @@ The objectives of Phase 09 were to:
 5. Monitor database read latency.
 6. Monitor database write latency.
 7. Associate CloudWatch alarms with the RDS DB instance.
-8. Integrate database alarms with the existing Amazon SNS notification topic.
+8. Integrate database alarms with the staged Amazon SNS alerts topic defined in `future/sns.tf`.
 9. Establish monitoring that reflects a basic production-style database reliability model.
 10. Provide CloudWatch visibility that can later be expanded into database dashboards and additional operational alerts.
 
@@ -61,9 +65,8 @@ Before implementing this phase, the following components were required:
 * AWS CLI configured with appropriate AWS credentials.
 * Existing Terraform project structure.
 * Existing VPC and networking resources from previous project phases.
-* Existing Amazon RDS PostgreSQL configuration from Phase 08.
-* Existing `aws_db_instance.postgres` Terraform resource.
-* Existing Amazon SNS alert topic represented by:
+* Staged Amazon RDS PostgreSQL configuration from Phase 08, including `aws_db_instance.postgres`.
+* Staged Amazon SNS alert topic configuration represented by `aws_sns_topic.alerts`.
 
 ```hcl
 aws_sns_topic.alerts
@@ -83,22 +86,17 @@ The CloudWatch alarms depend on the RDS instance because the database instance i
 
 ### 4.1 Create the RDS Monitoring Terraform File
 
-A dedicated Terraform file was created to separate database monitoring resources from the primary RDS infrastructure configuration.
-
-From the Terraform project directory:
-
-```powershell
-New-Item rds_monitoring.tf
-```
+During Phase 09 development, a dedicated `rds_monitoring.tf` file was created to separate database monitoring resources from the primary RDS infrastructure configuration. In the reconciled repository, this file is retained as `future/rds_monitoring.tf`.
 
 This created:
 
 ```text
-terraform/
+future/
 ├── rds.tf
 ├── rds_monitoring.tf
-├── variables.tf
-├── outputs.tf
+├── sns.tf
+├── variables_rds.tf
+├── outputs_rds.tf
 └── ...
 ```
 
@@ -176,11 +174,7 @@ The threshold:
 2147483648 bytes
 ```
 
-is equivalent to:
-
-```text
-2 GB
-```
+is equivalent to approximately `2 GB`, or exactly `2 GiB` using binary units.
 
 This alarm provides an early warning when database storage approaches exhaustion.
 
@@ -265,11 +259,7 @@ The threshold:
 134217728 bytes
 ```
 
-is equivalent to:
-
-```text
-128 MB
-```
+is equivalent to approximately `128 MB`, or exactly `128 MiB` using binary units.
 
 The `FreeableMemory` metric provides visibility into memory pressure on the RDS instance.
 
@@ -377,9 +367,9 @@ The completed Phase 09 monitoring configuration provides coverage for six import
 | Metric                | Alarm Condition     | Operational Purpose               |
 | --------------------- | ------------------- | --------------------------------- |
 | `CPUUtilization`      | Greater than 80%    | Detect sustained CPU pressure     |
-| `FreeStorageSpace`    | Less than 2 GB      | Detect storage capacity risk      |
+| `FreeStorageSpace`    | Less than 2 GiB     | Detect storage capacity risk      |
 | `DatabaseConnections` | Greater than 80     | Detect abnormal connection growth |
-| `FreeableMemory`      | Less than 128 MB    | Detect memory pressure            |
+| `FreeableMemory`      | Less than 128 MiB   | Detect memory pressure            |
 | `ReadLatency`         | Greater than 100 ms | Detect degraded read performance  |
 | `WriteLatency`        | Greater than 100 ms | Detect degraded write performance |
 
@@ -391,9 +381,9 @@ dimensions = {
 }
 ```
 
-This associates the CloudWatch metric directly with the PostgreSQL RDS instance deployed in Phase 08.
+This associates the CloudWatch metric with the PostgreSQL RDS instance definition from Phase 08. That RDS instance is not currently deployed; its Terraform configuration is retained under `future/`.
 
-Each alarm also sends alarm actions to:
+Each staged alarm is configured to send alarm actions to:
 
 ```hcl
 aws_sns_topic.alerts.arn
@@ -411,14 +401,17 @@ CloudWatch Alarm
 SNS Topic
     │
     ▼
-Notification
+Notification Target
+(if configured separately)
 ```
 
 ---
 
 ## 5. Deployment
 
-Before deployment, Terraform formatting and configuration validation should be performed.
+The commands in this section describe the Terraform workflow that would be used when integrating and deploying the staged Phase 09 monitoring configuration. The CloudWatch alarms, SNS topic, and associated RDS instance are not currently deployed.
+
+After the staged configuration has been integrated into a complete Terraform root module, formatting, validation, and execution-plan review should be performed before deployment.
 
 ### 5.1 Format Terraform Configuration
 
@@ -479,13 +472,13 @@ terraform apply
 
 Review the proposed changes and approve the deployment when prompted.
 
-Terraform then creates the CloudWatch alarms and associates them with the RDS PostgreSQL instance and SNS notification topic.
+When the staged RDS, SNS, and monitoring configuration is integrated and deployed, Terraform creates the CloudWatch alarms and associates them with the RDS PostgreSQL instance and SNS notification topic.
 
 ---
 
 ## 6. Validation
 
-Validation should be performed from both Terraform and the AWS Management Console.
+The validation procedures below document how the monitoring resources should be verified when the staged configuration is deployed. They do not describe the current AWS environment.
 
 ### 6.1 Validate with Terraform
 
@@ -603,7 +596,7 @@ aws_sns_topic.alerts.arn
 
 exists and is associated with the CloudWatch alarms.
 
-If an email subscription is being used, verify that the SNS subscription has been confirmed.
+If an SNS subscription is added separately, verify that the subscription is confirmed or otherwise active before relying on it for notification delivery.
 
 ---
 
@@ -670,20 +663,21 @@ The monitoring architecture introduced in this phase can be represented as:
 └─────────────────────────┼────────────────────────────────┘
                           │
                           ▼
-                  Alert Notification
+                  Notification Target
+                  (if subscription configured)
 ```
 
 Phase 09 does not change the network path to the database.
 
-The RDS instance remains privately deployed within the private subnet architecture established in previous phases. CloudWatch monitoring adds operational visibility without making the database publicly accessible.
+The validated Phase 08 RDS design places the database in private subnets. If the Phase 09 monitoring configuration is integrated and deployed, CloudWatch monitoring adds operational visibility without introducing public database access.
 
 ---
 
 ## 8. Results and Operational Significance
 
-Phase 09 added a monitoring layer to the PostgreSQL database environment.
+Phase 09 defined a Terraform-based monitoring layer for the PostgreSQL database environment and retained that configuration for future integration.
 
-The completed configuration provides visibility into:
+The staged monitoring configuration is designed to provide visibility into:
 
 ```text
 Compute
@@ -707,7 +701,7 @@ CloudWatch alarms convert these metrics into operational conditions that can gen
 
 This represents an important distinction between simply deploying infrastructure and operating infrastructure reliably.
 
-The implemented monitoring model provides the foundation for:
+The staged monitoring model provides the foundation for:
 
 * Proactive database monitoring.
 * Capacity management.
@@ -716,21 +710,19 @@ The implemented monitoring model provides the foundation for:
 * Incident investigation.
 * Database reliability engineering practices.
 
-The following statement can therefore be added to the project deployment guide:
-
-> Implemented CloudWatch monitoring for Amazon RDS PostgreSQL, including CPU utilization, storage capacity, memory pressure, database connections, and read/write latency. Alarms are integrated with SNS notifications to simulate production-grade database reliability monitoring.
+When deployed with the staged RDS and SNS components, the monitoring configuration would provide infrastructure-level observability across compute, memory, storage, connection, and I/O performance signals.
 
 ---
 
 ## 9. Security Considerations
 
-Monitoring was implemented without changing the network security posture established in previous phases.
+The Phase 09 monitoring design was defined without changing the network security posture established in previous phases.
 
 ### 9.1 RDS Remains Private
 
 CloudWatch monitoring does not require the RDS database to become publicly accessible.
 
-The PostgreSQL instance remains within the private subnet architecture implemented in Phase 08.
+The Phase 08 RDS design places PostgreSQL within the private subnet architecture, and the Phase 09 monitoring configuration does not alter that network posture.
 
 ```text
 Internet
@@ -757,7 +749,7 @@ Monitoring therefore adds observability without introducing an inbound Internet 
 
 ### 9.2 Security Group Controls Remain in Effect
 
-The existing database security group continues to control network access to PostgreSQL.
+The existing database security group remains the intended control point for PostgreSQL network access when the staged RDS configuration is deployed.
 
 CloudWatch metric collection does not require opening PostgreSQL port `5432` to the Internet.
 
@@ -866,7 +858,7 @@ threshold = 80
 
 is a monitoring threshold, not necessarily the PostgreSQL `max_connections` setting.
 
-The alarm is intended to warn when connection utilization exceeds the project's expected operating range.
+The alarm is intended to warn when the number of database connections exceeds the project's expected operating threshold.
 
 Production environments should establish the threshold relative to the actual connection limit and normal application workload.
 
@@ -897,7 +889,7 @@ If Terraform reports an error similar to an undeclared resource for:
 aws_sns_topic.alerts
 ```
 
-verify that the SNS topic has already been defined within the Terraform configuration.
+Verify that `future/sns.tf` is included with the staged monitoring configuration and defines `aws_sns_topic.alerts`.
 
 The monitoring resources depend on that topic for:
 
@@ -935,7 +927,7 @@ Key lessons included:
    CPU pressure, memory pressure, connection growth, storage capacity, and I/O latency are important signals when diagnosing database availability and performance incidents.
 
 8. **Observability should be implemented as Infrastructure as Code.**
-   Defining CloudWatch alarms in Terraform makes monitoring reproducible, version-controlled, and deployable alongside the database infrastructure.
+   Defining CloudWatch alarms in Terraform makes monitoring reproducible, version-controlled, and ready to deploy alongside the database infrastructure when the staged RDS environment is reintroduced.
 
 9. **A monitoring alarm identifies a condition, not necessarily the root cause.**
    Additional investigation using database logs, PostgreSQL statistics, query analysis, and supporting AWS metrics may still be necessary during an incident.

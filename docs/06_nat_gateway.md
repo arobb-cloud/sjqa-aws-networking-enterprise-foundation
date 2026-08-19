@@ -61,7 +61,7 @@ The intended traffic flow is:
                    Private Route Table
                             │
                      Private Subnet A
-                       10.22.2.0/24
+                       10.22.11.0/24
                             │
                     ┌───────────────┐
                     │ Private AWS   │
@@ -77,17 +77,23 @@ The NAT Gateway would then translate the private source address to its associate
 
 Return traffic would follow the established NAT session back to the originating private resource.
 
+### Multi-AZ Design Consideration
+
+This phase intentionally models a single NAT Gateway located in Public Subnet A.
+
+Because both private subnets use the shared private route table, enabling this design would route Internet-bound traffic from both Availability Zones through the NAT Gateway in Availability Zone A.
+
+This is sufficient to demonstrate centralized private-subnet egress, but it should not be interpreted as a fully resilient production Multi-AZ NAT design.
+
+A higher-availability production architecture would typically evaluate NAT Gateway placement and private route tables on a per-Availability-Zone basis so that private workloads do not depend on a NAT Gateway located in another Availability Zone.
+
 ---
 
 ## 4. Terraform Configuration
 
 ### 4.1 Create the NAT Gateway Terraform File
 
-A dedicated Terraform file was planned for the NAT Gateway configuration:
-
-```powershell
-New-Item nat_gateway.tf
-```
+A dedicated Terraform file, `terraform/nat_gateway.tf`, contains the optional NAT Gateway configuration. The configuration is retained in the active Terraform directory but is disabled by default so that the cost-sensitive NAT resources are not provisioned during the standard project deployment.
 
 The file separates NAT-related resources from the existing VPC, subnet, routing, and security configuration.
 
@@ -99,6 +105,7 @@ The following Terraform resource would allocate an Elastic IP address for the NA
 
 ```hcl
 resource "aws_eip" "nat_a" {
+  count  = var.enable_nat_gateway ? 1 : 0
   domain = "vpc"
 
   tags = {
@@ -121,7 +128,9 @@ The following resource would create the NAT Gateway inside Public Subnet A:
 
 ```hcl
 resource "aws_nat_gateway" "nat_a" {
-  allocation_id = aws_eip.nat_a.id
+  count = var.enable_nat_gateway ? 1 : 0
+
+  allocation_id = aws_eip.nat_a[0].id
   subnet_id     = aws_subnet.public_a.id
 
   tags = {
@@ -152,9 +161,11 @@ The private route table would receive a default route directing Internet-bound t
 
 ```hcl
 resource "aws_route" "private_nat" {
+  count = var.enable_nat_gateway ? 1 : 0
+
   route_table_id         = aws_route_table.private.id
   destination_cidr_block = "0.0.0.0/0"
-  nat_gateway_id         = aws_nat_gateway.nat_a.id
+  nat_gateway_id         = aws_nat_gateway.nat_a[0].id
 }
 ```
 
@@ -191,15 +202,17 @@ The following outputs were planned to expose the NAT Gateway ID and public Elast
 
 ```hcl
 output "nat_gateway_id" {
-  value = aws_nat_gateway.nat_a.id
+  description = "ID of the NAT Gateway when enabled."
+  value       = var.enable_nat_gateway ? aws_nat_gateway.nat_a[0].id : null
 }
 
 output "nat_gateway_public_ip" {
-  value = aws_eip.nat_a.public_ip
+  description = "Public IP address assigned to the NAT Gateway Elastic IP when enabled."
+  value       = var.enable_nat_gateway ? aws_eip.nat_a[0].public_ip : null
 }
 ```
 
-These outputs would make it easier to verify the deployed NAT Gateway and identify its associated public IP address after deployment.
+These outputs expose the NAT Gateway ID and Elastic IP only when `enable_nat_gateway = true`. When the NAT capability is disabled, both outputs evaluate to `null`. This allows `terraform output` to remain valid without requiring the optional NAT resources to exist.
 
 ---
 
@@ -230,9 +243,9 @@ The private subnet's route table would then direct `0.0.0.0/0` traffic to the NA
 
 ### Deployment Status
 
-**Not Deployed — Cost-Control Decision**
+**Disabled by Default / Not Currently Deployed — Cost-Control Decision**
 
-The NAT Gateway resources were intentionally not provisioned in AWS.
+The NAT Gateway resources are not part of the project's default active deployment. The Terraform configuration is retained so the capability can be enabled and validated when required, while avoiding ongoing NAT Gateway charges during normal portfolio use.
 
 The configuration was retained as an architectural design and Terraform implementation reference to demonstrate how private subnet outbound Internet access would be implemented in a production-style environment.
 
@@ -263,6 +276,19 @@ aws_route.private_nat
 aws_route_table.private
 ```
 
+The optional NAT configuration also includes a corresponding private-subnet return-path control:
+
+```text
+enable_nat_gateway = true
+        │
+        ├── aws_eip.nat_a
+        ├── aws_nat_gateway.nat_a
+        ├── aws_route.private_nat
+        └── aws_network_acl_rule.private_inbound_ephemeral_from_internet
+```
+
+This ensures that the private default route and the NAT-specific inbound ephemeral NACL rule are enabled by the same feature flag.
+
 The design confirms that:
 
 1. An Elastic IP would be allocated for the NAT Gateway.
@@ -270,6 +296,7 @@ The design confirms that:
 3. The NAT Gateway would depend on the Internet Gateway.
 4. The private route table would use the NAT Gateway as its default Internet route.
 5. Private resources would not receive a direct Internet Gateway route.
+6. The private NACL would permit inbound ephemeral return traffic when the NAT capability is enabled.
 
 ### Runtime Validation Not Performed
 
@@ -358,7 +385,31 @@ Security Groups continue to enforce resource-level traffic controls for applicat
 
 The public and private Network ACLs configured during the previous security phase continue to provide subnet-level controls.
 
-Because Network ACLs are stateless, appropriate outbound and return-path rules must continue to exist for traffic traversing the NAT architecture.
+Because Network ACLs are stateless, outbound connections from private-subnet resources require corresponding inbound return-path rules.
+
+The current Terraform configuration includes a conditional private NACL rule specifically for NAT return traffic:
+
+```hcl
+resource "aws_network_acl_rule" "private_inbound_ephemeral_from_internet" {
+  count = var.enable_nat_gateway ? 1 : 0
+
+  network_acl_id = aws_network_acl.private.id
+  rule_number    = 130
+  egress         = false
+  protocol       = "tcp"
+  rule_action    = "allow"
+  cidr_block     = "0.0.0.0/0"
+  from_port      = 1024
+  to_port        = 65535
+}
+```
+This rule is created only when `enable_nat_gateway = true`.
+
+It permits inbound ephemeral-port return traffic required for connections initiated by resources in the private subnets through the NAT Gateway.
+
+When `enable_nat_gateway = false`, the NAT Gateway, the private default route, and this NAT-specific inbound ephemeral NACL rule are not created.
+
+Because the NAT Gateway was not deployed during this phase, end-to-end NAT connectivity and return-path behavior were not validated against a running NAT Gateway.
 
 ### Database Exposure
 
@@ -425,7 +476,24 @@ Verify that private resources:
 
 ---
 
-## 10. Lessons Learned
+## 10. Current Repository State
+
+The NAT Gateway capability is retained in the repository as optional Terraform configuration.
+
+The current project state distinguishes the NAT design from the persistent networking foundation:
+
+* The VPC, Multi-AZ subnets, route tables, Security Groups, and Network ACLs remain part of the active networking configuration.
+* NAT Gateway infrastructure is disabled by default and is not part of the current deployed environment.
+* The NAT design includes an Elastic IP, NAT Gateway, and private default route when the optional capability is enabled.
+* Private Internet connectivity should not be inferred from the existence of outbound NACL rules alone.
+* The private NACL includes a conditional inbound ephemeral-port rule for NAT return traffic. This rule is created only when `enable_nat_gateway = true`.
+* Because the NAT Gateway was not deployed, the conditional NAT route and NACL return-path behavior remain Terraform-defined but not runtime-validated.
+* The single-NAT design demonstrates private egress architecture but does not provide per-AZ NAT resiliency.
+
+This approach preserves the Terraform implementation while preventing unnecessary recurring AWS charges during normal portfolio use.
+
+---
+## 11. Lessons Learned
 
 This phase demonstrated several important AWS networking concepts.
 
@@ -466,7 +534,7 @@ The private subnet sends traffic **to** the NAT Gateway but does not contain the
 
 Not every technically valid resource needs to remain deployed in this project environment.
 
-The NAT Gateway configuration was intentionally documented rather than provisioned because the additional runtime cost was unnecessary for demonstrating the architectural concept.
+The NAT Gateway configuration was intentionally retained in Terraform but left disabled by default because the additional runtime cost was unnecessary for demonstrating the architectural concept.
 
 ### Documentation Can Capture Undeployed Production Design
 
@@ -483,9 +551,9 @@ This distinguishes a deliberate engineering decision from an incomplete implemen
 
 ---
 
-## 11. Final Architecture State
+## 12. Current and Optional Architecture State
 
-At the completion of Phase 06, the **implemented** environment remains:
+At the completion of Phase 06, the persistent Terraform networking foundation remains:
 
 ```text
                               Internet
@@ -498,19 +566,19 @@ At the completion of Phase 06, the **implemented** environment remains:
                     ▼                           ▼
              Public Subnet A              Public Subnet B
                us-east-1a                   us-east-1b
-              10.22.1.0/24                 10.22.3.0/24
+              10.22.1.0/24                 10.22.2.0/24
                     │                           │
                     └──────── Public Tier ──────┘
 
 
              Private Subnet A             Private Subnet B
                us-east-1a                   us-east-1b
-              10.22.2.0/24                 10.22.4.0/24
+              10.22.11.0/24                 10.22.12.0/24
                     │                           │
                     └──────── Private Tier ─────┘
 ```
 
-The **planned production NAT architecture** would extend the environment as follows:
+The optional NAT architecture, when enabled, would extend the environment as follows:
 
 ```text
                               Internet
@@ -540,6 +608,6 @@ The **planned production NAT architecture** would extend the environment as foll
               Private Workloads           Private Workloads
 ```
 
-**Deployment status:** Designed and documented; NAT Gateway intentionally not provisioned for cost-control purposes.
+**Deployment status:** Terraform configuration retained; NAT Gateway capability disabled by default and not currently deployed for cost-control purposes.
 
 This phase therefore completes the NAT Gateway architectural design while maintaining a cost-conscious portfolio environment.

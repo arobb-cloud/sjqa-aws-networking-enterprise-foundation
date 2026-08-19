@@ -3,7 +3,10 @@ project_name = "networking-enterprise-foundation"
 environment  = "dev"
 owner        = "cloud-portfolio"
 
+# Optional NAT Gateway
 enable_nat_gateway = false
 
+# Optional bastion host
 enable_bastion = false
-ssh_key_name   = null
+ssh_key_name = null
+bastion_allowed_cidr = null

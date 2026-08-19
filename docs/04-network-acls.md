@@ -5,7 +5,7 @@
 The purpose of this phase is to add **subnet-level network traffic controls** to the AWS VPC by implementing custom Network Access Control Lists (NACLs).
 Phase 03 introduced Security Groups to control traffic at the individual AWS resource or network-interface level. Phase 04 adds a second layer of network security by controlling which traffic can enter or leave the **public and private subnets**.
 
-The NACL configuration will support:
+The NACL configuration supports:
 
 * Public subnet web traffic
 * Private subnet traffic
@@ -89,6 +89,7 @@ The conceptual architecture is:
                      Public Subnet
                             │
                ┌───────────────────────┐
+               │ Future / Optional     │
                │ Bastion / App Server  │
                └───────────────────────┘
                             │
@@ -101,9 +102,12 @@ The conceptual architecture is:
                      Private Subnet
                             │
                ┌───────────────────────┐
+               │ Future / Staged       │
                │ PostgreSQL / RDS      │
                └───────────────────────┘
 ```
+
+The workload components shown in this diagram represent traffic patterns that the NACL design is intended to support. They do not indicate that a bastion host, application server, or RDS PostgreSQL database is currently deployed.
 
 This creates multiple layers of network control.
 
@@ -230,6 +234,8 @@ This resource creates the private subnet NACL and associates it with:
 aws_subnet.private_a
 ```
 
+Phase sequencing note: At this stage of the project, the custom NACLs are associated with the original public_a and private_a subnets. Additional Availability Zone resources are introduced in the later Multi-AZ networking phase. This section documents the Phase 04 implementation rather than the final expanded subnet topology.
+
 ---
 
 # Public Subnet NACL Rules
@@ -276,20 +282,32 @@ This allows HTTPS traffic into the public subnet.
 
 ```hcl
 resource "aws_network_acl_rule" "public_inbound_ssh" {
+  count = var.enable_bastion ? 1 : 0
+
   network_acl_id = aws_network_acl.public.id
   rule_number    = 120
   egress         = false
   protocol       = "tcp"
   rule_action    = "allow"
-  cidr_block     = "0.0.0.0/0"
+  cidr_block     = var.bastion_allowed_cidr
   from_port      = 22
   to_port        = 22
 }
 ```
 
-This permits SSH at the subnet boundary.
+This rule permits SSH through the public subnet boundary only when the optional bastion capability is enabled.
 
-The NACL provides only one layer of access control. SSH access should still be restricted through the Bastion or management Security Group rather than relying solely on the NACL.
+The rule is controlled by:
+
+`enable_bastion = true`
+
+and its permitted source CIDR is supplied through:
+
+`bastion_allowed_cidr`
+
+When `enable_bastion = false`, the SSH NACL rule is not created.
+
+The NACL remains only one layer of access control. The Management Security Group introduced for the bastion architecture provides the corresponding resource-level SSH restriction.
 
 ---
 
@@ -382,7 +400,7 @@ resource "aws_network_acl_rule" "private_inbound_postgres_from_vpc" {
 
 This allows PostgreSQL traffic originating from inside the VPC to cross the private subnet boundary.
 
-The database Security Group from Phase 03 provides the more precise control over which application or management resources can actually establish the database connection.
+The database Security Group from Phase 03 provides the more precise control over which application-tier resources can actually establish a PostgreSQL connection. In the Phase 03 Security Group model, PostgreSQL TCP/5432 is permitted from the Application Security Group to the Database Security Group.
 
 ---
 
@@ -423,6 +441,33 @@ resource "aws_network_acl_rule" "private_inbound_ephemeral_from_vpc" {
 ```
 
 This allows TCP response traffic originating from resources within the VPC.
+
+---
+
+## 11.1 Allow NAT Return Traffic When Enabled
+
+The current Terraform configuration includes an additional conditional inbound ephemeral-port rule for private-subnet Internet return traffic:
+
+```hcl
+resource "aws_network_acl_rule" "private_inbound_ephemeral_from_internet" {
+  count = var.enable_nat_gateway ? 1 : 0
+
+  network_acl_id = aws_network_acl.private.id
+  rule_number    = 130
+  egress         = false
+  protocol       = "tcp"
+  rule_action    = "allow"
+  cidr_block     = "0.0.0.0/0"
+  from_port      = 1024
+  to_port        = 65535
+}
+```
+
+This rule is created only when `enable_nat_gateway = true`.
+
+Because Network ACLs are stateless, return traffic for connections initiated by private-subnet resources through the NAT Gateway must be explicitly permitted at the subnet boundary.
+
+When the NAT Gateway capability is disabled, this rule is not created.
 
 ---
 
@@ -647,7 +692,7 @@ The exact IDs are assigned dynamically by AWS.
 
 # Expected Result
 
-At the completion of Phase 04, the VPC should contain two custom Network ACLs:
+At the completion of Phase 04, the Terraform configuration defined two custom Network ACLs:
 
 ```text
 VPC
@@ -686,8 +731,26 @@ Internet / VPC Traffic
 (resource level)
         │
         ▼
- EC2 / PostgreSQL / RDS
+ Protected AWS Workload
+ (when deployed)
 ```
+
+---
+
+# Current Repository State
+
+The custom Network ACL configuration remains part of the active Terraform networking foundation under `terraform/`.
+
+The current repository distinguishes these persistent subnet-level security controls from optional or staged workloads and routing components:
+
+* The Public and Private Network ACL resources remain part of the active Terraform configuration.
+* The NACL rules continue to define subnet-level traffic boundaries independently of whether corresponding workloads are deployed.
+* Security Groups provide the complementary resource-level controls described in Phase 03.
+* Application-tier compute resources are not currently deployed.
+* Amazon RDS PostgreSQL configuration is retained as staged/future infrastructure and is not part of the current active deployment.
+* NAT-dependent private Internet routing should not be inferred solely from the outbound HTTP and HTTPS NACL allowances.
+
+The NACL configuration therefore remains useful as part of the persistent networking and security foundation while cost-sensitive or workload-specific infrastructure can be deployed separately when required.
 
 ---
 
@@ -801,10 +864,11 @@ Phase 03 and Phase 04 now work together as complementary controls.
                   └────────┬────────┘
                            │
                            ▼
-                  ┌─────────────────┐
-                  │ AWS Resource    │
-                  │ EC2 / RDS / DB  │
-                  └─────────────────┘
+                  ┌────────────────────┐
+                  │ Protected AWS      │
+                  │ Workload           │
+                  │ (when deployed)    │
+                  └────────────────────┘
 ```
 
 The responsibilities are different:
@@ -824,17 +888,15 @@ The Security Group provides fine-grained access control to individual workloads.
 
 ### Public SSH
 
-The public NACL currently permits TCP port 22 from:
+The public SSH NACL rule is optional and is created only when the bastion capability is enabled.
 
-```text
-0.0.0.0/0
-```
+Its source is defined by:
 
-This means the **subnet boundary** does not reject SSH based on source address.
+`var.bastion_allowed_cidr`
 
-The Security Group should therefore provide the more restrictive SSH rule, such as allowing access only from an approved administrative IP address.
+rather than a fixed `0.0.0.0/0` source.
 
-For a more restrictive production architecture, the NACL itself could also be narrowed to a trusted CIDR.
+This keeps the subnet-level SSH allowance aligned with the optional bastion architecture documented in Phase 07. The Management Security Group provides the corresponding resource-level access control.
 
 ### PostgreSQL
 
@@ -890,7 +952,7 @@ Internet Gateway
 Internet
 ```
 
-That architecture is addressed separately in the NAT Gateway phase.
+That architecture is addressed separately in the NAT Gateway phase. The NAT Gateway configuration represents optional/cost-sensitive infrastructure and should not be interpreted from these NACL rules as currently deployed. Without an active NAT Gateway and corresponding private route, these outbound NACL allowances do not provide Internet connectivity to private-subnet resources.
 
 ---
 
@@ -950,4 +1012,4 @@ Security Group
 AWS Resource
 ```
 
-This establishes a layered network security model that can be expanded as the architecture later introduces Multi-AZ networking, NAT Gateway routing, bastion management, RDS PostgreSQL, and additional enterprise security controls.
+This established a layered network security model that later phases expanded through Multi-AZ networking and additional optional or staged capabilities, including NAT Gateway routing, bastion management, RDS PostgreSQL, and enterprise security controls.

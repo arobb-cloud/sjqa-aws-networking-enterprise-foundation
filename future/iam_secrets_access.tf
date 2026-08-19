@@ -16,8 +16,3 @@ resource "aws_iam_policy" "read_rds_secret" {
     ]
   })
 }
-
-resource "aws_iam_role_policy_attachment" "app_read_rds_secret" {
-  role       = aws_iam_role.app_role.name
-  policy_arn = aws_iam_policy.read_rds_secret.arn
-}

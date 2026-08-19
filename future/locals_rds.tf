@@ -1,11 +1,8 @@
 locals {
-  name_prefix = "${var.project_name}-${var.environment}"
+  rds_admin_secret = jsondecode(
+    data.aws_secretsmanager_secret_version.rds_postgres_admin_current.secret_string
+  )
 
-  common_tags = {
-    Project     = var.project_name
-    Environment = var.environment
-    Owner       = var.owner
-    ManagedBy   = "Terraform"
-    Purpose     = "AWS Networking Portfolio Project"
-  }
+  rds_admin_username = local.rds_admin_secret.username
+  rds_admin_password = local.rds_admin_secret.password
 }

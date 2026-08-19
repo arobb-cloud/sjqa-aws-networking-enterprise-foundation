@@ -1,10 +1,10 @@
-#Phase 10 – Enterprise Security Hardening
+# Phase 10 – Enterprise Security Hardening
 
 ## 1. Purpose
 
 The purpose of this phase was to strengthen the AWS networking and database environment by introducing production-style security controls around database credentials and access to sensitive configuration data.
 
-Earlier phases established the network architecture, security boundaries, RDS PostgreSQL deployment, and CloudWatch monitoring. Phase 10 builds on that foundation by removing database administrator credentials from the Terraform variable workflow and introducing AWS Secrets Manager and IAM least-privilege access controls.
+Earlier phases established the network architecture, security boundaries, RDS PostgreSQL deployment, and CloudWatch monitoring. Phase 10 builds on that foundation by defining a staged AWS Secrets Manager and IAM least-privilege architecture for database credential management. The configuration is retained under `future/` and is not part of the currently deployed networking baseline.
 
 The broader production-hardening areas considered for the environment include:
 
@@ -16,7 +16,9 @@ The broader production-hardening areas considered for the environment include:
 * Cost controls
 * Operational documentation
 
-The implementation in this phase focuses specifically on **Secrets Manager integration and least-privilege IAM access**.
+The staged implementation in this phase focuses specifically on Secrets Manager integration and least-privilege IAM access.
+
+**Current Repository State:** The Phase 10 Secrets Manager, IAM, and RDS credential-integration resources are retained as staged Terraform configuration under `future/`. These resources are not currently deployed. The Phase 08 RDS instance was previously deployed and validated, then destroyed to avoid ongoing AWS charges.
 
 ---
 
@@ -24,14 +26,14 @@ The implementation in this phase focuses specifically on **Secrets Manager integ
 
 The objectives for this phase were to:
 
-1. Create an AWS Secrets Manager secret for the RDS PostgreSQL administrator credentials.
-2. Store the actual database credentials separately from Terraform configuration files.
-3. Retrieve the secret through Terraform data sources.
-4. Decode the stored JSON secret into Terraform local values.
-5. Configure the RDS PostgreSQL instance to consume the retrieved credentials.
+1. Define an AWS Secrets Manager secret for the RDS PostgreSQL administrator credentials.
+2. Define a pattern for storing the actual database credentials separately from Terraform configuration files.
+3. Define Terraform data sources for retrieving the secret.
+4. Define Terraform local values for decoding the stored JSON secret.
+5. Define the intended RDS PostgreSQL integration for consuming the retrieved credentials.
 6. Define an IAM policy granting only the permissions required to retrieve the database secret.
 7. Establish a pattern for attaching secret access only to authorized application or compute roles.
-8. Validate the Terraform configuration and confirm creation of the secret through the AWS CLI.
+8. Document Terraform and AWS validation procedures for a future deployment.
 9. Document additional production-hardening controls for future implementation.
 
 ---
@@ -41,6 +43,8 @@ The objectives for this phase were to:
 Phase 10 introduces AWS Secrets Manager between the application/infrastructure layer and the database credentials.
 
 The intended security model is:
+
+The following diagram represents the intended Phase 10 security architecture when the staged RDS and Secrets Manager configuration is integrated and deployed.
 
 ```text
                     AWS Account
@@ -77,7 +81,7 @@ The intended security model is:
               └──────────────────────┘
 ```
 
-This architecture reduces reliance on plaintext database passwords stored directly in Terraform variable files and provides a centralized AWS service for managing sensitive credentials.
+This architecture is designed to reduce reliance on plaintext database passwords stored directly in Terraform variable files and provides a centralized AWS service for managing sensitive credentials.
 
 ---
 
@@ -85,11 +89,7 @@ This architecture reduces reliance on plaintext database passwords stored direct
 
 ## 4.1 Create the Secrets Manager Configuration
 
-A new Terraform file was created:
-
-```powershell
-New-Item secrets.tf
-```
+During Phase 10 development, Secrets Manager configuration was separated into a dedicated Terraform file. In the reconciled repository, this configuration is retained as `future/secrets.tf`.
 
 The following resource defines the Secrets Manager secret container:
 
@@ -107,23 +107,32 @@ resource "aws_secretsmanager_secret" "rds_postgres_admin" {
 }
 ```
 
-This resource creates the Secrets Manager object but does not place the actual username or password inside the Terraform configuration.
+The staged configuration creates both the Secrets Manager secret container and a Terraform-managed secret version. The secret version stores the database username and password as JSON using the staged database credential variables.
 
-The separation is intentional. Terraform manages the secret resource while the sensitive credential value is inserted separately.
+Although this removes the credentials from ordinary resource arguments and centralizes them in AWS Secrets Manager, Terraform still handles the sensitive values during deployment and may retain them in Terraform state.
 
 ---
 
-## 4.2 Populate the Secret Manually
+## 4.2 Create the Secret Version
 
-The secret value was designed to be populated outside the Terraform configuration using the AWS CLI.
+The staged Terraform configuration also defines a Secrets Manager secret version in `future/secrets.tf`.
 
-Example:
+The secret version stores the database username and password as a JSON-formatted value:
 
-```powershell
-aws secretsmanager put-secret-value `
-  --secret-id <secret-name-or-arn> `
-  --secret-string '{"username":"postgres_admin","password":"REPLACE_WITH_STRONG_PASSWORD"}'
+```hcl
+resource "aws_secretsmanager_secret_version" "rds_postgres_admin" {
+  secret_id = aws_secretsmanager_secret.rds_postgres_admin.id
+
+  secret_string = jsonencode({
+    username = var.db_username
+    password = var.db_password
+  })
+}
 ```
+
+`jsonencode()` stores the username and password as a JSON-formatted secret value in AWS Secrets Manager.
+
+The sensitive values are still supplied to Terraform through `var.db_username` and `var.db_password`. Therefore, this pattern centralizes runtime credential storage in Secrets Manager but does not eliminate Terraform's exposure to the credential values.
 
 The secret uses JSON so that the username and password can be retrieved independently:
 
@@ -140,11 +149,7 @@ The real password should never be included in project documentation, screenshots
 
 ## 4.3 Retrieve the Secret with Terraform
 
-A new Terraform file was created:
-
-```powershell
-New-Item data_secrets.tf
-```
+Terraform data sources for the staged Secrets Manager integration are retained in `future/data_secrets.tf`.
 
 The following data sources retrieve the secret and its current value:
 
@@ -166,7 +171,7 @@ The second retrieves the current version containing the credential JSON.
 
 ## 4.4 Decode the Secret
 
-The following values were added to `locals.tf` when preparing the RDS deployment:
+The RDS-specific local values used by the staged credential integration are retained in `future/locals_rds.tf`.
 
 ```hcl
 locals {
@@ -198,7 +203,7 @@ Otherwise, Terraform may attempt to retrieve a secret version that has not yet b
 
 ## 4.5 Update the RDS PostgreSQL Configuration
 
-The existing `rds.tf` configuration was updated so that the database administrator credentials reference the values retrieved from Secrets Manager.
+The staged RDS configuration in `future/rds.tf` is designed to reference credential values retrieved through the Secrets Manager integration.
 
 ```hcl
 resource "aws_db_instance" "postgres" {
@@ -209,13 +214,9 @@ resource "aws_db_instance" "postgres" {
 }
 ```
 
-This replaces the previous pattern where the database password was supplied directly through a Terraform variable such as:
+This changes how the staged RDS resource consumes the database credentials. Rather than referencing the credential variables directly, the RDS resource consumes values retrieved from Secrets Manager and decoded into Terraform local values.
 
-```hcl
-db_password = "REPLACE_WITH_STRONG_PASSWORD"
-```
-
-The change improves credential management by separating the database password from the normal Terraform configuration and `terraform.tfvars` workflow.
+This pattern centralizes the database credential in AWS Secrets Manager and allows the staged RDS configuration to consume the secret through a consistent AWS-managed credential location. Because Terraform still receives and handles the credential values in this implementation, the Terraform input path and state must continue to be treated as sensitive.
 
 ---
 
@@ -223,11 +224,7 @@ The change improves credential management by separating the database password fr
 
 ## 5.1 Create the Secret Access Policy
 
-A new Terraform file was created:
-
-```powershell
-New-Item iam_secrets_access.tf
-```
+The staged least-privilege IAM policy is retained in `future/iam_secrets_access.tf`.
 
 The following IAM policy grants only the permissions necessary to retrieve and inspect the RDS administrator secret:
 
@@ -292,11 +289,15 @@ In a production environment, this could instead represent an:
 
 The policy should not be attached to unrelated users, services, or administrative roles.
 
+No workload-role attachment should be described as currently deployed unless a corresponding IAM role and policy attachment exist in the active or staged Terraform source.
+
 ---
 
 # 6. Deployment
 
-Before deployment, the Terraform configuration was formatted and validated.
+The commands in this section describe the workflow that would be used when integrating and deploying the staged Phase 10 configuration. The Secrets Manager, IAM, and associated RDS credential-integration resources are not currently deployed.
+
+**Important:** The files under `future/` are retained as staged infrastructure configuration and are not intended to be deployed as an independent Terraform root module in their current repository location. Before deploying Phase 10, the required Secrets Manager, IAM, RDS, variables, data sources, and local-value configuration must be integrated into the active Terraform root configuration under `terraform/`, or assembled into another complete Terraform root module with all required dependencies and provider configuration.
 
 ```powershell
 terraform fmt
@@ -312,17 +313,17 @@ If the planned resources and changes are correct:
 terraform apply
 ```
 
-The Secrets Manager secret must contain a valid secret version before Terraform attempts to retrieve the credential values for the RDS deployment.
+The integrated configuration must ensure that the Secrets Manager secret contains a current secret version before Terraform attempts to retrieve and consume that value for the RDS configuration. The Terraform dependency graph should be reviewed during integration to confirm the required ordering between the secret, secret version, data sources, local values, and RDS resource.
 
 ---
 
 # 7. Validation
 
-Validation was performed at both the Terraform and AWS service levels.
+The following procedures document how the staged Phase 10 resources should be validated when they are deployed.
 
 ## 7.1 Terraform Validation
 
-The following commands were used:
+The following commands should be used:
 
 ```powershell
 terraform fmt
@@ -335,7 +336,7 @@ Expected results:
 * Terraform files are properly formatted.
 * Terraform configuration passes syntax and dependency validation.
 * The execution plan contains only the expected infrastructure changes.
-* No plaintext database password appears in the Terraform configuration.
+* No database password is hard-coded in tracked Terraform source files or committed repository content.
 
 ---
 
@@ -381,7 +382,7 @@ Confirm that:
 ---
 
 # 8. Security Considerations
-Phase 10 strengthens the security architecture by moving database credential management away from plaintext Terraform variables and toward AWS-native secret management.
+The Phase 10 design strengthens the intended security architecture by moving toward AWS-native credential management and least-privilege secret access.
 
 ### Credential Management
 
@@ -413,12 +414,7 @@ The IAM policy therefore:
 
 The security controls established in earlier phases remain in effect.
 
-The RDS PostgreSQL database remains:
-
-* Located in private subnets.
-* Protected by the database security group.
-* Unavailable through direct public access.
-* Reachable only through explicitly authorized network paths.
+When the staged RDS configuration is deployed, PostgreSQL remains designed to operate in private subnets, protected by the database security group and without direct public accessibility.
 
 Secrets Manager does not replace network-level security controls. It complements them by protecting credential storage and access.
 
@@ -434,13 +430,15 @@ For a more advanced production environment, customer-managed AWS KMS keys could 
 
 Although Secrets Manager removes the password from normal Terraform configuration files, retrieving the secret through Terraform and passing it into the RDS `password` argument can still expose sensitive information to **Terraform state**.
 
-Therefore, the Terraform state backend itself must be treated as sensitive infrastructure data and protected through:
+Therefore, Terraform state must be treated as sensitive infrastructure data. Access to state should be restricted regardless of backend type.
 
-* Restricted IAM access.
-* S3 encryption.
-* S3 public access blocking.
-* State locking where appropriate.
-* Controlled administrative access.
+If the project is later migrated to an Amazon S3 remote-state backend, appropriate controls should include:
+
+- Restricted IAM access.
+- S3 encryption.
+- S3 Block Public Access.
+- State locking using the selected backend mechanism, where applicable.
+- Controlled administrative access.
 
 Removing a password from `terraform.tfvars` does not by itself guarantee that Terraform never handles or stores the credential.
 
@@ -525,13 +523,9 @@ creates the secret container but does not automatically create the username/pass
 
 ### Resolution
 
-Populate the secret before attempting to retrieve the current version:
+Verify that `future/secrets.tf` includes `aws_secretsmanager_secret_version.rds_postgres_admin` and that the required credential variables are supplied to Terraform.
 
-```powershell
-aws secretsmanager put-secret-value `
-  --secret-id <secret-name-or-arn> `
-  --secret-string '{"username":"postgres_admin","password":"REPLACE_WITH_STRONG_PASSWORD"}'
-```
+Confirm that the secret-version resource is included in the same integrated Terraform configuration as the data source that retrieves the current secret value.
 
 ---
 
@@ -563,14 +557,18 @@ Terraform attempts to retrieve the secret value before a secret version exists.
 
 ### Resolution
 
-Use a staged deployment process:
+Verify that the integrated Terraform configuration includes:
 
-1. Create the Secrets Manager secret.
-2. Populate the secret value.
-3. Introduce or enable the Terraform data source that retrieves the secret version.
-4. Deploy the RDS configuration that consumes the credentials.
+1. `aws_secretsmanager_secret.rds_postgres_admin`.
+2. `aws_secretsmanager_secret_version.rds_postgres_admin`.
+3. `data.aws_secretsmanager_secret.rds_postgres_admin`.
+4. `data.aws_secretsmanager_secret_version.rds_postgres_admin_current`.
+5. The RDS-specific local values defined in `future/locals_rds.tf`.
+6. The RDS credential references in `future/rds.tf`.
 
-This prevents Terraform from attempting to read a secret value that has not yet been created.
+Also verify that the required `db_username` and `db_password` variable values are supplied securely before planning or applying the staged configuration.
+
+Terraform should then be able to establish the required dependency relationships between the secret, secret version, retrieved secret data, local values, and RDS instance.
 
 ---
 
@@ -594,14 +592,14 @@ Key lessons include:
 
 Phase 10 extended the AWS networking project from infrastructure deployment toward a more production-oriented security architecture.
 
-The phase established:
+Phase 10 defined and retained a staged enterprise-hardening design that includes:
 
-* AWS Secrets Manager for RDS PostgreSQL administrator credentials.
-* Separation of database passwords from normal Terraform variable files.
-* Terraform integration with Secrets Manager.
-* Least-privilege IAM policy design for secret retrieval.
-* A controlled model for attaching secret access to authorized workloads.
-* Security validation procedures.
-* A roadmap for additional logging, compliance, encryption, and cost-management controls.
+- AWS Secrets Manager configuration for RDS PostgreSQL administrator credentials.
+- A pattern for separating database credentials from ordinary Terraform variable files.
+- Terraform data-source and local-value integration for Secrets Manager.
+- A least-privilege IAM policy for secret retrieval.
+- A controlled model for future workload-role attachment.
+- Future deployment and validation procedures.
+- A roadmap for additional logging, compliance, encryption, and cost-management controls.
 
-With Phase 10, the project demonstrates not only how AWS infrastructure can be provisioned with Terraform, but also how credential management and IAM controls can be incorporated into the infrastructure lifecycle using production-oriented security principles.
+Phase 10 demonstrates how credential management and least-privilege IAM controls can be incorporated into a Terraform-managed AWS architecture while clearly separating staged security-hardening configuration from the project's currently active networking baseline.

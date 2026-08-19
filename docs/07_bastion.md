@@ -27,7 +27,7 @@ Private Subnet
 Private EC2 / Future RDS PostgreSQL
 ```
 
-This phase was designed and validated through Terraform but was **not deployed**. The Terraform configuration was retained for future implementation.
+This phase was implemented in Terraform but was not deployed. The bastion configuration remains in the active Terraform codebase and is disabled by default through the `enable_bastion` feature flag.
 
 ---
 
@@ -37,11 +37,11 @@ The objectives of this phase were to:
 
 1. Define an SSH key-pair variable for bastion authentication.
 2. Dynamically retrieve a current Amazon Linux 2023 AMI.
-3. Define SSH access to the management security group.
+3. Define configurable SSH access to the management security group using an administrator-supplied CIDR range.
 4. Define an EC2 bastion host within the public subnet.
 5. Assign a public IP address to the bastion host.
 6. Create Terraform outputs for the bastion instance ID and public IP address.
-7. Validate the Terraform configuration without deploying the EC2 instance.
+7. Validate the Terraform configuration with the bastion feature disabled by default.
 8. Preserve the bastion configuration for future implementation.
 
 ---
@@ -89,19 +89,31 @@ The design preserves the public/private subnet boundary established in previous 
 
 ## 4. Terraform Configuration
 
-### 4.1 Define the SSH Key Pair Variable
+### 4.1 Define Bastion Configuration Variables
 
-The following variable was added to `variables.tf`:
+The following variables were added to `variables.tf`:
 
 ```hcl
+variable "enable_bastion" {
+  description = "Controls whether the EC2 bastion host is deployed"
+  type        = bool
+  default     = false
+}
+
 variable "ssh_key_name" {
   description = "Name of the EC2 key pair for bastion access"
   type        = string
   default     = null
 }
+
+variable "bastion_allowed_cidr" {
+  description = "IPv4 CIDR permitted to SSH to the bastion host"
+  type        = string
+  default     = null
+}
 ```
 
-This variable allows the EC2 key-pair name to be supplied externally rather than hard-coded into the bastion resource.
+These variables control whether the bastion infrastructure is created, supply the name of an existing EC2 key pair for SSH authentication, and define the IPv4 CIDR permitted to initiate SSH connections. With `enable_bastion` set to `false`, the bastion-related resources are not created.
 
 ---
 
@@ -117,6 +129,8 @@ The Amazon Linux 2023 AMI is retrieved dynamically:
 
 ```hcl
 data "aws_ami" "amazon_linux_2023" {
+  count = var.enable_bastion ? 1 : 0
+
   most_recent = true
   owners      = ["amazon"]
 
@@ -137,9 +151,11 @@ The following ingress rule was designed for the existing management security gro
 
 ```hcl
 resource "aws_vpc_security_group_ingress_rule" "bastion_ssh_from_internet" {
+  count = var.enable_bastion ? 1 : 0
+
   security_group_id = aws_security_group.management.id
 
-  cidr_ipv4   = "0.0.0.0/0"
+  cidr_ipv4   = var.bastion_allowed_cidr
   from_port   = 22
   to_port     = 22
   ip_protocol = "tcp"
@@ -150,7 +166,7 @@ resource "aws_vpc_security_group_ingress_rule" "bastion_ssh_from_internet" {
 
 This rule permits SSH connections to the bastion host.
 
-> **Security Note:** `0.0.0.0/0` allows SSH attempts from any IPv4 address and should not be used for a production bastion host. A production implementation should restrict TCP port 22 to an approved administrative public IP address or CIDR range. Modern AWS environments should also evaluate AWS Systems Manager Session Manager as an alternative that can eliminate the requirement for publicly exposed SSH access.
+> **Security Note:** The permitted SSH source is supplied through `bastion_allowed_cidr`. When the bastion is enabled, this value should be restricted to an approved administrative public IP address or trusted CIDR range. A value such as `0.0.0.0/0` would expose TCP port 22 to the entire IPv4 internet and should not be used for production access.
 
 ---
 
@@ -160,7 +176,9 @@ The following EC2 resource was prepared:
 
 ```hcl
 resource "aws_instance" "bastion" {
-  ami                         = data.aws_ami.amazon_linux_2023.id
+  count = var.enable_bastion ? 1 : 0
+
+  ami                         = data.aws_ami.amazon_linux_2023[0].id
   instance_type               = "t2.micro"
   subnet_id                   = aws_subnet.public_a.id
   vpc_security_group_ids      = [aws_security_group.management.id]
@@ -193,11 +211,13 @@ The following outputs were added to `outputs.tf`:
 
 ```hcl
 output "bastion_instance_id" {
-  value = aws_instance.bastion.id
+  description = "EC2 instance ID of the bastion host when enabled."
+  value       = var.enable_bastion ? aws_instance.bastion[0].id : null
 }
 
 output "bastion_public_ip" {
-  value = aws_instance.bastion.public_ip
+  description = "Public IP address of the bastion host when enabled."
+  value       = var.enable_bastion ? aws_instance.bastion[0].public_ip : null
 }
 ```
 
@@ -211,13 +231,11 @@ The bastion host was **not deployed during this phase**.
 
 The Terraform resources were intentionally retained as a future architecture component rather than applying the configuration and maintaining an active EC2 instance.
 
-The `bastion.tf` configuration was moved to:
+The bastion configuration remains in `terraform/bastion.tf` as part of the project's active Terraform codebase. Deployment is controlled through the `enable_bastion` variable, which defaults to `false`.
 
-```text
-terraform/future/
-```
+With the default configuration, Terraform does not create the bastion AMI lookup, SSH ingress rule, or EC2 instance because each bastion component uses the conditional expression `count = var.enable_bastion ? 1 : 0`.
 
-This keeps the design available for later implementation while preventing it from becoming part of the project's currently deployed Terraform configuration.
+This approach preserves the architecture for future use while preventing the bastion host from being provisioned during normal project validation.
 
 No `terraform apply` was performed for the bastion host.
 
@@ -225,7 +243,7 @@ No `terraform apply` was performed for the bastion host.
 
 ## 6. Validation
 
-Although the bastion infrastructure was not deployed, the Terraform configuration was reviewed and prepared using the standard Terraform validation workflow:
+The repository has been formatted, validated, and planned with the bastion feature disabled. Because `enable_bastion` defaults to `false`, the normal Terraform plan does not propose creation of the bastion EC2 instance or its associated SSH ingress rule.
 
 ```powershell
 terraform fmt
@@ -250,14 +268,15 @@ A screenshot of the validation/planning process was retained with the project do
 
 If this phase were deployed, the configuration would introduce the following primary AWS components:
 
-| Resource                       | Purpose                                           |
-| ------------------------------ | ------------------------------------------------- |
-| Amazon EC2 Bastion Host        | Administrative entry point into the VPC           |
-| Amazon Linux 2023 AMI          | Operating system for the bastion host             |
-| Public IPv4 Address            | Allows administrative connectivity to the bastion |
-| Management Security Group Rule | Controls SSH access to the bastion                |
-| EC2 Key Pair                   | Provides SSH authentication                       |
-| Public Subnet                  | Hosts the internet-accessible bastion instance    |
+| Component                              | Role                                        |
+| -------------------------------------- | ------------------------------------------- |
+| Amazon EC2 Bastion Host                | Administrative entry point into the VPC     |
+| Amazon Linux 2023 AMI lookup           | Selects an existing AWS-provided AMI        |
+| Public IPv4 Address                    | Enables public connectivity to the bastion  |
+| Management Security Group ingress rule | Restricts SSH access to the configured CIDR |
+| Existing EC2 Key Pair                  | Provides SSH authentication when supplied   |
+| Existing Public Subnet                 | Hosts the bastion instance                  |
+
 
 The bastion would reuse networking and security components created during previous project phases rather than creating a separate network architecture.
 
@@ -288,10 +307,10 @@ The following security principles apply:
    The project configuration specifies:
 
    ```hcl
-   cidr_ipv4 = "0.0.0.0/0"
+   cidr_ipv4 = var.bastion_allowed_cidr
    ```
 
-   This is intentionally permissive for the documented design and should not be considered production-ready. Production SSH access should be limited to approved administrator IP addresses or trusted network ranges.
+   The security of this rule depends on the value supplied through `bastion_allowed_cidr`. When the bastion is enabled, the variable should be set to an approved administrator public IP address or trusted CIDR range. A broad value such as `0.0.0.0/0` would expose SSH to the entire IPv4 internet and should not be used for production access.
 
 3. **The bastion should use a dedicated management security group.**
    Management access should remain separate from application and database traffic.
@@ -368,7 +387,7 @@ Key lessons include:
 * Public IP addresses do not need to be assigned to every resource that requires administration.
 * Security groups can be used to define trusted management relationships between tiers.
 * Open SSH access such as `0.0.0.0/0` is inappropriate for production environments.
-* Terraform can document and validate future infrastructure even when deployment is intentionally deferred.
+* Terraform feature flags can retain optional infrastructure in the main configuration while preventing deployment until the capability is explicitly enabled.
 * Cost-conscious project environments do not need to keep management infrastructure running continuously.
 * Modern AWS architectures may replace traditional SSH bastion patterns with Systems Manager Session Manager to reduce public exposure and key-management requirements.
 
@@ -376,12 +395,12 @@ Key lessons include:
 
 ## 12. Phase Outcome
 
-**Status: Designed and documented — deployment deferred.**
+**Status: Implemented in Terraform — disabled by default; deployment deferred.**
 
 Phase 07 established the Terraform design for a bastion-host management architecture but did not provision the EC2 instance.
 
 The phase demonstrated how administrative access could be routed through a controlled public management host while preserving the isolation of private resources.
 
-The Terraform configuration was retained under the `terraform/future/` directory for potential later implementation.
+The Terraform configuration remains in `terraform/bastion.tf` and is controlled through the `enable_bastion` feature flag. Because the variable defaults to `false`, the bastion host is not created during the project's normal Terraform workflow.
 
 This leaves the network architecture prepared for future private-resource administration without incurring the cost or security exposure of maintaining an unnecessary public EC2 management host during the current project stage.

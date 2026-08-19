@@ -1,18 +1,18 @@
-# 03 — Security Groups
+# Phase 03 — Security Groups
 
 ## Purpose
 
 The purpose of this phase is to implement reusable AWS Security Groups that provide network-level access control between the management, application, and database tiers of the VPC.
 
-The security model is designed to support current and future workloads, including:
+The security model is designed to support current networking controls and future workloads, including:
 
-* PostgreSQL database servers
-* Application servers
-* Bastion or management hosts
-* Future Amazon RDS deployments
-* Future Amazon EC2 deployments
+* PostgreSQL database workloads.
+* Application servers.
+* Bastion or management hosts.
+* Future Amazon RDS deployments.
+* Future Amazon EC2 application workloads.
 
-The design follows a tiered security model in which access to the database tier is restricted to authorized application resources rather than being exposed directly to the internet.
+The design follows a tiered security model in which database access is restricted to authorized application-tier resources rather than being exposed directly to the Internet.
 
 ---
 
@@ -21,9 +21,9 @@ The design follows a tiered security model in which access to the database tier 
 The objectives of this phase are to:
 
 * Create separate Security Groups for the database, application, and management tiers.
-* Allow PostgreSQL traffic from the application tier to the database tier over TCP port 5432.
-* Allow SSH access from the management tier to the application tier over TCP port 22.
-* Prevent direct internet access to the database tier.
+* Allow PostgreSQL traffic from the application tier to the database tier over TCP port `5432`.
+* Establish controlled administrative access between management and application tiers.
+* Prevent direct Internet access to the database tier.
 * Configure outbound connectivity for each Security Group.
 * Manage Security Group rules as standalone Terraform resources.
 * Expose Security Group IDs as Terraform outputs for use by later infrastructure phases.
@@ -32,33 +32,21 @@ The objectives of this phase are to:
 
 ## Architecture / Design
 
-The Security Groups provide logical access controls between the infrastructure tiers.
+The Security Groups provide logical access controls between infrastructure tiers.
 
 ```text
-Internet
-   │
-   ▼
-Internet Gateway
-   │
-   ▼
-Public Subnet
-   │
-   ┌───────────────────────┐
-   │ Bastion Host          │
-   │ Application Server    │
-   └───────────────────────┘
-              │
-              ▼
-       Security Groups
-              │
-              ▼
-Private Subnet
-   │
-   ┌───────────────────────┐
-   │ PostgreSQL            │
-   │ Amazon RDS            │
-   └───────────────────────┘
+Management Tier
+      │
+      │ Administrative Access
+      ▼
+Application Tier
+      │
+      │ PostgreSQL TCP/5432
+      ▼
+Database Tier
 ```
+
+The Security Groups establish reusable network boundaries even when corresponding compute or database workloads are not currently deployed.
 
 The primary security principle is:
 
@@ -74,7 +62,9 @@ The primary security principle is:
 | Application SG | Outbound       | All      |  All | Outbound traffic                 |
 | Management SG  | Outbound       | All      |  All | Outbound traffic                 |
 
-Security Group references are used instead of fixed source CIDR ranges for inter-tier communication. This allows resources associated with the approved source Security Group to communicate with the destination tier without depending on individual instance IP addresses.
+Security Group references are used instead of fixed source CIDR ranges for inter-tier communication where appropriate. This allows resources associated with an approved source Security Group to communicate with the destination tier without depending on individual instance IP addresses.
+
+The optional bastion configuration introduced later uses an additional CIDR-based ingress rule on the Management Security Group so that administrative SSH access can be restricted to a configured source network.
 
 ---
 
@@ -88,7 +78,7 @@ Create a dedicated Terraform configuration file for Security Group resources:
 New-Item security_groups.tf
 ```
 
-This separates Security Group configuration from the VPC and subnet configuration and makes the network security policy easier to maintain.
+This separates Security Group configuration from VPC and subnet configuration and makes the network security policy easier to maintain.
 
 ---
 
@@ -111,7 +101,7 @@ resource "aws_security_group" "database" {
 }
 ```
 
-The database Security Group is intended for PostgreSQL workloads, including the later Amazon RDS deployment.
+The database Security Group is intended for PostgreSQL workloads, including the Amazon RDS PostgreSQL configuration evaluated in a later phase.
 
 Ingress and egress rules are managed separately rather than being defined inline.
 
@@ -136,6 +126,8 @@ resource "aws_security_group" "application" {
 
 This Security Group represents application-tier workloads that may require access to PostgreSQL.
 
+The Security Group itself remains useful as part of the active network-security foundation even when an application workload is not currently deployed.
+
 ---
 
 ### 4. Create the Management Security Group
@@ -155,17 +147,19 @@ resource "aws_security_group" "management" {
 }
 ```
 
-The management Security Group provides a logical security boundary for administrative systems such as bastion hosts.
+The Management Security Group provides a logical security boundary for administrative systems such as the optional bastion host introduced in a later phase.
+
+The Management Security Group is part of the active Terraform networking configuration even when the optional bastion EC2 instance is disabled.
 
 ---
 
 ### 5. Allow PostgreSQL Access from the Application Tier
 
-Create a standalone ingress rule permitting application-tier resources to communicate with the database tier over PostgreSQL's TCP port 5432:
+Create a standalone ingress rule permitting application-tier resources to communicate with the database tier over PostgreSQL TCP port `5432`:
 
 ```hcl
 resource "aws_vpc_security_group_ingress_rule" "postgres_from_application" {
-  security_group_id             = aws_security_group.database.id
+  security_group_id            = aws_security_group.database.id
   referenced_security_group_id = aws_security_group.application.id
 
   from_port   = 5432
@@ -178,17 +172,19 @@ resource "aws_vpc_security_group_ingress_rule" "postgres_from_application" {
 
 This rule references the Application Security Group as the source rather than allowing a broad CIDR range.
 
-As a result, database access is restricted to resources associated with the Application Security Group.
+As a result, PostgreSQL access is restricted to resources associated with the Application Security Group.
+
+The rule establishes the permitted network path whether or not a database instance is currently deployed.
 
 ---
 
 ### 6. Allow SSH from the Management Tier
 
-Create an ingress rule allowing management resources to connect to application resources using SSH:
+Create an ingress rule allowing resources associated with the Management Security Group to connect to application-tier resources using SSH:
 
 ```hcl
 resource "aws_vpc_security_group_ingress_rule" "ssh_from_management" {
-  security_group_id             = aws_security_group.application.id
+  security_group_id            = aws_security_group.application.id
   referenced_security_group_id = aws_security_group.management.id
 
   from_port   = 22
@@ -199,7 +195,7 @@ resource "aws_vpc_security_group_ingress_rule" "ssh_from_management" {
 }
 ```
 
-This establishes a controlled administrative path:
+This establishes the following logical administrative path:
 
 ```text
 Management SG
@@ -209,7 +205,9 @@ Management SG
 Application SG
 ```
 
-SSH is therefore not authorized by this rule from arbitrary internet addresses.
+This rule does not authorize arbitrary Internet addresses to connect directly to the Application Security Group.
+
+A later bastion phase adds a separate ingress mechanism for the Management Security Group, using a configurable source CIDR and feature-controlled bastion deployment.
 
 ---
 
@@ -256,7 +254,7 @@ resource "aws_vpc_security_group_egress_rule" "management_all_outbound" {
 }
 ```
 
-The broad outbound rules simplify connectivity during the initial implementation. More restrictive egress policies could be introduced later if required by the security model.
+The broad outbound rules simplify connectivity for the project environment. More restrictive egress policies could be introduced in a future hardening iteration if required.
 
 ---
 
@@ -278,7 +276,7 @@ output "management_security_group_id" {
 }
 ```
 
-These outputs make the Security Group IDs available for validation and for use by later infrastructure components.
+These outputs make the Security Group IDs available for validation and use by later infrastructure components.
 
 ---
 
@@ -296,18 +294,16 @@ Validate the Terraform syntax and resource configuration:
 terraform validate
 ```
 
-Generate and save the execution plan:
+Generate and review the execution plan:
 
 ```powershell
 terraform plan -out=tfplan
 ```
 
-Review the plan before deploying the resources.
-
-If the plan is correct, apply the configuration:
+If the plan is correct, apply the reviewed configuration:
 
 ```powershell
-terraform apply
+terraform apply tfplan
 ```
 
 After deployment, verify that Terraform is tracking the Security Groups and associated rules:
@@ -322,7 +318,7 @@ Verify the Terraform outputs:
 terraform output
 ```
 
-Expected outputs include:
+Expected Security Group outputs include:
 
 ```text
 application_security_group_id
@@ -336,11 +332,11 @@ management_security_group_id
 
 This phase establishes three reusable Security Groups:
 
-* **Database Security Group** — protects PostgreSQL and future Amazon RDS resources.
-* **Application Security Group** — provides the security boundary for application-tier resources.
-* **Management Security Group** — provides the security boundary for bastion and administrative resources.
+* **Database Security Group** — provides the network-security boundary for PostgreSQL workloads and staged Amazon RDS integration.
+* **Application Security Group** — provides the network-security boundary for application-tier workloads.
+* **Management Security Group** — provides the network-security boundary for administrative resources and the optional bastion design.
 
-The resulting access model is:
+The resulting logical access model is:
 
 ```text
 Management
@@ -354,7 +350,25 @@ Application
 Database
 ```
 
-The database tier does not receive a rule permitting direct inbound internet access.
+This diagram represents permitted Security Group relationships. It does not imply that application servers, a bastion host, or an RDS database are currently deployed.
+
+The database tier does not receive a rule permitting direct inbound Internet access.
+
+---
+
+## Current Repository State
+
+The Security Groups created in this phase remain part of the active Terraform configuration under `terraform/`.
+
+The current repository distinguishes these persistent network-security controls from optional or staged workloads:
+
+* The Database, Application, and Management Security Groups remain active Terraform resources.
+* The bastion host configuration remains under `terraform/` but is disabled by default through `enable_bastion = false`.
+* The bastion SSH ingress configuration is associated with the Management Security Group and is controlled using the configured management source CIDR.
+* Amazon RDS PostgreSQL configuration is retained under `future/` and is not part of the current active deployment.
+* Application-tier compute resources are not currently deployed.
+
+This allows the network-security foundation to remain defined independently of cost-sensitive or future workloads.
 
 ---
 
@@ -364,7 +378,7 @@ The database tier does not receive a rule permitting direct inbound internet acc
 
 Security Groups can represent infrastructure roles rather than individual servers.
 
-Instead of creating security policies around specific IP addresses, this implementation establishes:
+Instead of creating security policies around specific instance IP addresses, this implementation establishes:
 
 ```text
 Management Tier
@@ -372,7 +386,7 @@ Application Tier
 Database Tier
 ```
 
-This makes the design reusable when EC2 instances, RDS databases, or other workloads are introduced later.
+This makes the design reusable when EC2 instances, RDS databases, or other workloads are introduced.
 
 ### Security Group Referencing
 
@@ -384,7 +398,7 @@ For example:
 referenced_security_group_id = aws_security_group.application.id
 ```
 
-means the database rule trusts resources associated with the Application Security Group rather than an arbitrary IP range.
+means the database rule trusts resources associated with the Application Security Group rather than an arbitrary source IP range.
 
 This provides a more maintainable security model as infrastructure changes.
 
@@ -397,26 +411,28 @@ Terraform supports two common approaches for defining Security Group rules:
 
 This project uses standalone rule resources.
 
-Separating Security Groups from individual rules makes each rule explicit and independently manageable and helps avoid mixing inline and standalone rule-management approaches for the same Security Group.
+Separating Security Groups from individual rules makes each rule explicit and independently manageable and avoids mixing inline and standalone rule-management approaches for the same Security Group.
 
 ### Stateful Firewall Behavior
 
 AWS Security Groups are stateful.
 
-When traffic is permitted into a resource, response traffic for that connection is automatically allowed. A separate inbound rule does not need to be created solely for the return traffic.
+When traffic is permitted for an established connection, response traffic is automatically allowed. Separate Security Group rules are therefore not required solely to permit return traffic for that connection.
 
 ---
 
 ## Phase Completion
 
-Phase 03 establishes the network security boundaries required by later phases of the project.
+Phase 03 established the network-security boundaries required by later phases of the project.
 
-At completion, the VPC contains reusable security controls for:
+At completion of this phase, the Terraform configuration defined reusable security controls for:
 
-* Management resources
-* Application resources
-* PostgreSQL database resources
-* Future EC2 workloads
-* Future Amazon RDS workloads
+* Management-tier resources.
+* Application-tier resources.
+* PostgreSQL database resources.
+* Future EC2 workloads.
+* Future Amazon RDS workloads.
 
-The environment is now prepared for subsequent networking and workload deployment phases while maintaining separation between infrastructure tiers.
+The Security Groups remain part of the active networking foundation even though several workloads they are designed to protect are optional, staged, or currently undeployed.
+
+The Terraform configuration was therefore prepared to support subsequent networking and workload phases while maintaining separation between infrastructure tiers.

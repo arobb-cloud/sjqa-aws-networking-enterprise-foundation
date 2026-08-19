@@ -42,13 +42,13 @@ resource "aws_db_instance" "postgres" {
   instance_class = "db.t3.micro"
 
   allocated_storage     = 20
-  max_allocated_storage = 20
+  max_allocated_storage = 30
   storage_type          = "gp2"
   storage_encrypted     = true
 
   db_name  = var.db_name
-  username = var.db_username
-  password = var.db_password
+  username = local.rds_admin_username
+  password = local.rds_admin_password
 
   db_subnet_group_name   = aws_db_subnet_group.postgres.name
   vpc_security_group_ids = [aws_security_group.database.id]
