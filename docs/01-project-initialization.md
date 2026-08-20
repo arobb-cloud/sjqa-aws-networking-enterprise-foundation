@@ -53,7 +53,7 @@ The project began by creating a dedicated GitHub repository, creating the local 
 ```powershell
 git init
 git branch -M main
-git remote add origin https://github.com/<github-username>/<repository-name>.git
+git remote add origin https://github.com/arobb-cloud/sjqa-aws-networking-enterprise-foundation.git
 git remote -v
 ```
 
