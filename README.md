@@ -136,7 +136,7 @@ These files are retained as staged infrastructure configuration and are not part
 
 ### Enterprise Extensions
 
-Staged and previously validated enterprise extensions include:
+Enterprise extensions include the previously validated RDS deployment and additional staged infrastructure configuration for future integration:
 
 * Private Amazon RDS PostgreSQL architecture, previously deployed and validated during Phase 08
 * Encrypted RDS storage configuration
@@ -221,7 +221,7 @@ Local Terraform working files such as `.terraform/` and `terraform.tfvars` are i
 
 ## Deployment
 
-The active infrastructure is deployed from the `terraform/` directory.
+The active infrastructure configuration is deployed from the `terraform/` directory.
 
 High-level deployment workflow:
 
